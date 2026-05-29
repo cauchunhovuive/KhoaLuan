@@ -1,0 +1,208 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  SHIPPING
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  COD
+  BANKING
+  MOMO
+  VNPAY
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  REFUNDED
+}
+
+model User {
+  id             String    @id @default(uuid())
+  email          String    @unique
+  password       String
+  name           String
+  phone          String?
+  avatar         String?
+  address        String?
+  isActive       Boolean   @default(true)
+  role           UserRole  @default(CUSTOMER)
+  refreshToken   String?
+  clusterId      String?
+  totalSpent     Float     @default(0)
+  orderCount     Int       @default(0)
+  lastPurchaseAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  orders      Order[]
+  reviews     Review[]
+  cartItems   CartItem[]
+  cluster     Cluster?       @relation(fields: [clusterId], references: [id])
+  recommendations Recommendation[]
+}
+
+model Category {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  image       String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  products Product[]
+}
+
+model Product {
+  id            String   @id @default(uuid())
+  name          String
+  slug          String   @unique
+  description   String?
+  price         Float
+  discountPrice Float?
+  images        String[]
+  stock         Int      @default(0)
+  soldCount     Int      @default(0)
+  rating        Float    @default(0)
+  reviewCount   Int      @default(0)
+  isActive      Boolean  @default(true)
+  categoryId    String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  category    Category    @relation(fields: [categoryId], references: [id])
+  orderItems  OrderItem[]
+  reviews     Review[]
+  cartItems   CartItem[]
+  recommendations Recommendation[]
+}
+
+model Order {
+  id             String        @id @default(uuid())
+  userId         String
+  totalAmount    Float
+  shippingFee    Float         @default(0)
+  discountAmount Float         @default(0)
+  finalAmount    Float
+  status         OrderStatus   @default(PENDING)
+  paymentMethod  PaymentMethod @default(COD)
+  paymentStatus  PaymentStatus @default(UNPAID)
+  shippingAddress String
+  phone          String
+  note           String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  user        User        @relation(fields: [userId], references: [id])
+  orderItems  OrderItem[]
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String
+  productId String
+  quantity  Int
+  price     Float
+
+  order   Order   @relation(fields: [orderId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model CartItem {
+  id        String @id @default(uuid())
+  userId    String
+  productId String
+  quantity  Int    @default(1)
+
+  user    User    @relation(fields: [userId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([userId, productId])
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  userId    String
+  productId String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([userId, productId])
+}
+
+model Cluster {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  color       String   @default("#6366f1")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users        User[]
+  clusterRules ClusterRule[]
+}
+
+model ClusterRule {
+  id             String   @id @default(uuid())
+  clusterId      String
+  metricName     String   // recency, frequency, monetary, age, gender
+  minValue       Float?
+  maxValue       Float?
+  priority       Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  cluster Cluster @relation(fields: [clusterId], references: [id])
+}
+
+model Recommendation {
+  id             String   @id @default(uuid())
+  userId         String?
+  clusterId      String?
+  productId      String
+  score          Float    @default(0)
+  reason         String?  // based_on_cluster, based_on_purchase, similar_product
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  user    User?    @relation(fields: [userId], references: [id])
+  product Product  @relation(fields: [productId], references: [id])
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  type        String   // ORDER, SYSTEM
+  title       String
+  message     String?
+  referenceId String?  // orderId, etc.
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model SiteSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String   // JSON string for complex values
+  updatedAt DateTime @updatedAt
+}

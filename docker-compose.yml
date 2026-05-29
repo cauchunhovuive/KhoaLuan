@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: khoaluan-postgres
+    environment:
+      POSTGRES_DB: khoaluan
+      POSTGRES_USER: khoaluan
+      POSTGRES_PASSWORD: khoaluan123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - khoaluan-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: khoaluan-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - khoaluan-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: khoaluan-backend
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=development
+      - PORT=5000
+      - DATABASE_URL=postgresql://khoaluan:khoaluan123@postgres:5432/khoaluan
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=khoaluan-jwt-secret-key
+      - JWT_REFRESH_SECRET=khoaluan-refresh-secret-key
+      - JWT_EXPIRES_IN=7d
+      - JWT_REFRESH_EXPIRES_IN=30d
+      - ML_SERVICE_URL=http://ml-service:8000
+    depends_on:
+      - postgres
+      - redis
+      - ml-service
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - khoaluan-network
+
+  ml-service:
+    build:
+      context: ./backend/ml
+      dockerfile: Dockerfile.ml
+    container_name: khoaluan-ml
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://khoaluan:khoaluan123@postgres:5432/khoaluan
+    depends_on:
+      - postgres
+    volumes:
+      - ./backend/ml:/app
+    networks:
+      - khoaluan-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: khoaluan-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:5000/api
+      - VITE_ML_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - khoaluan-network
+
+volumes:
+  postgres_data:
+
+networks:
+  khoaluan-network:
+    driver: bridge

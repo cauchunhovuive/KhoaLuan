@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "KhoaLuan",
+    "slug": "khoaluan",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#3B82F6"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.khoaluan.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#3B82F6"
+      },
+      "package": "com.khoaluan.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
