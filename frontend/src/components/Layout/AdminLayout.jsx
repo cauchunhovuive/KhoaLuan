@@ -5,7 +5,7 @@ import {
   FiHome, FiPackage, FiGrid, FiShoppingBag, FiUsers,
   FiPieChart, FiTrendingUp, FiSettings, FiLogOut,
   FiMenu, FiChevronLeft, FiBell, FiCheck, FiClock,
-  FiUserCheck,
+  FiUserCheck, FiTag, FiImage, FiZap, FiRefreshCw, FiAlertTriangle, FiFileText,
 } from 'react-icons/fi';
 import { logout } from '../../store/authSlice';
 import { fetchNotifications, markAsRead, markAllAsRead } from '../../store/notificationSlice';
@@ -17,6 +17,12 @@ const sidebarItems = [
   { icon: FiShoppingBag, label: 'Đơn hàng', path: '/admin/orders' },
   { icon: FiUsers, label: 'Người dùng', path: '/admin/users' },
   { icon: FiUserCheck, label: 'Đối tác', path: '/admin/partners' },
+  { icon: FiTag, label: 'Mã giảm giá', path: '/admin/coupons' },
+  { icon: FiImage, label: 'Banner', path: '/admin/banners' },
+  { icon: FiZap, label: 'Flash Sale', path: '/admin/flash-sales' },
+  { icon: FiRefreshCw, label: 'Hoàn trả', path: '/admin/refunds' },
+  { icon: FiAlertTriangle, label: 'Vi phạm', path: '/admin/violations' },
+  { icon: FiFileText, label: 'Audit Log', path: '/admin/audit' },
   { icon: FiPieChart, label: 'Phân cụm', path: '/admin/clusters' },
   { icon: FiTrendingUp, label: 'Gợi ý', path: '/admin/recommendations' },
   { icon: FiSettings, label: 'Cài đặt', path: '/admin/settings' },

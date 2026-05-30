@@ -303,6 +303,198 @@ async function main() {
   ]);
   console.log('  ✔ Tạo 6 đánh giá mẫu');
 
+  // ─── Mã giảm giá (Coupon) ───
+  const now = new Date();
+  const futureDate = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000); // +90 ngày
+  const pastDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);   // -30 ngày
+
+  const coupons = await Promise.all([
+    // Admin coupons (system-wide)
+    prisma.coupon.create({
+      data: {
+        code: 'WELCOME10',
+        type: 'PERCENTAGE',
+        value: 10,
+        minOrderValue: 200000,
+        maxDiscount: 50000,
+        usageLimit: 100,
+        perUserLimit: 1,
+        startsAt: pastDate,
+        expiresAt: futureDate,
+        isActive: true,
+        description: 'Giảm 10% cho đơn hàng từ 200K (tối đa 50K). Dành cho khách hàng mới!',
+        createdById: admin.id,
+      },
+    }),
+    prisma.coupon.create({
+      data: {
+        code: 'SALE50K',
+        type: 'FIXED',
+        value: 50000,
+        minOrderValue: 500000,
+        usageLimit: 200,
+        perUserLimit: 2,
+        startsAt: pastDate,
+        expiresAt: futureDate,
+        isActive: true,
+        description: 'Giảm 50K cho đơn hàng từ 500K. Áp dụng cho tất cả khách hàng.',
+        createdById: admin.id,
+      },
+    }),
+    prisma.coupon.create({
+      data: {
+        code: 'FREESHIP',
+        type: 'FIXED',
+        value: 30000,
+        minOrderValue: 200000,
+        usageLimit: 500,
+        perUserLimit: 1,
+        startsAt: pastDate,
+        expiresAt: futureDate,
+        isActive: true,
+        description: 'Miễn phí vận chuyển (giảm 30K) cho đơn từ 200K.',
+        createdById: admin.id,
+      },
+    }),
+    prisma.coupon.create({
+      data: {
+        code: 'VIP100K',
+        type: 'FIXED',
+        value: 100000,
+        minOrderValue: 1000000,
+        maxDiscount: null,
+        usageLimit: 50,
+        perUserLimit: 3,
+        startsAt: pastDate,
+        expiresAt: futureDate,
+        isActive: true,
+        description: 'Giảm 100K cho đơn hàng từ 1 triệu. Dành cho khách hàng thân thiết.',
+        createdById: admin.id,
+      },
+    }),
+
+    // Partner 1 coupons (Shop Điện Tử ABC - partner1)
+    prisma.coupon.create({
+      data: {
+        code: 'ABC20',
+        type: 'PERCENTAGE',
+        value: 20,
+        minOrderValue: 500000,
+        maxDiscount: 200000,
+        usageLimit: 50,
+        perUserLimit: 1,
+        startsAt: pastDate,
+        expiresAt: futureDate,
+        isActive: true,
+        description: 'Giảm 20% (tối đa 200K) cho đơn từ 500K. Áp dụng cho sản phẩm Shop Điện Tử ABC.',
+        createdById: partners[0].id,
+      },
+    }),
+    prisma.coupon.create({
+      data: {
+        code: 'ABC100K',
+        type: 'FIXED',
+        value: 100000,
+        minOrderValue: 1000000,
+        usageLimit: 30,
+        perUserLimit: 1,
+        startsAt: pastDate,
+        expiresAt: futureDate,
+        isActive: true,
+        description: 'Giảm 100K cho đơn từ 1 triệu tại Shop Điện Tử ABC.',
+        createdById: partners[0].id,
+      },
+    }),
+
+    // Partner 2 coupon (Fashion House XYZ - partner2)
+    prisma.coupon.create({
+      data: {
+        code: 'FASHION15',
+        type: 'PERCENTAGE',
+        value: 15,
+        minOrderValue: 300000,
+        maxDiscount: 150000,
+        usageLimit: 50,
+        perUserLimit: 1,
+        startsAt: pastDate,
+        expiresAt: futureDate,
+        isActive: true,
+        description: 'Giảm 15% (tối đa 150K) cho đơn từ 300K tại Fashion House XYZ.',
+        createdById: partners[1].id,
+      },
+    }),
+
+    // Expired coupon (test case)
+    prisma.coupon.create({
+      data: {
+        code: 'EXPIRED50',
+        type: 'PERCENTAGE',
+        value: 50,
+        minOrderValue: 100000,
+        maxDiscount: 100000,
+        usageLimit: 10,
+        perUserLimit: 1,
+        startsAt: new Date(pastDate.getTime() - 60 * 24 * 60 * 60 * 1000), // 90 ngày trước
+        expiresAt: pastDate, // đã hết hạn
+        isActive: true,
+        description: 'Mã đã hết hạn - giảm 50% (tối đa 100K).',
+        createdById: admin.id,
+      },
+    }),
+
+    // Inactive coupon (test case)
+    prisma.coupon.create({
+      data: {
+        code: 'INACTIVE20',
+        type: 'PERCENTAGE',
+        value: 20,
+        minOrderValue: 0,
+        maxDiscount: 50000,
+        usageLimit: 100,
+        perUserLimit: 1,
+        startsAt: pastDate,
+        expiresAt: futureDate,
+        isActive: false, // bị tắt bởi admin
+        description: 'Mã đã bị tắt - giảm 20% (tối đa 50K).',
+        createdById: admin.id,
+      },
+    }),
+  ]);
+  console.log(`  ✔ Tạo ${coupons.length} mã giảm giá mẫu`);
+
+  // ─── Lịch sử sử dụng mã giảm giá (CouponUsage) ───
+  const usages = await Promise.all([
+    // Customer 1 dùng WELCOME10
+    prisma.couponUsage.create({
+      data: {
+        couponId: coupons[0].id, // WELCOME10
+        userId: customers[0].id,
+        orderId: orders[0].id,
+        usedAt: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000), // 7 ngày trước
+      },
+    }),
+    // Customer 2 dùng FREESHIP
+    prisma.couponUsage.create({
+      data: {
+        couponId: coupons[2].id, // FREESHIP
+        userId: customers[1].id,
+        orderId: orders[2].id,
+        usedAt: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000), // 3 ngày trước
+      },
+    }),
+  ]);
+
+  // Cập nhật usedCount cho coupon đã được dùng
+  await prisma.coupon.update({
+    where: { id: coupons[0].id },
+    data: { usedCount: 1 },
+  });
+  await prisma.coupon.update({
+    where: { id: coupons[2].id },
+    data: { usedCount: 1 },
+  });
+  console.log(`  ✔ Tạo ${usages.length} lịch sử sử dụng mã giảm giá`);
+
   // ─── Cập nhật tổng chi tiêu ───
   const allOrders = await prisma.order.findMany({ select: { userId: true, finalAmount: true } });
   const spentByUser = {};

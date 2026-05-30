@@ -65,9 +65,20 @@ model User {
   orders          Order[]
   reviews         Review[]
   cartItems       CartItem[]
+  wishlistItems   WishlistItem[]
   cluster         Cluster?       @relation(fields: [clusterId], references: [id])
   recommendations Recommendation[]
   products        Product[]      @relation("PartnerProducts")
+  couponsCreated  Coupon[]
+  couponUsages    CouponUsage[]
+  addresses        Address[]
+  refunds          Refund[]
+  auditLogs        AuditLog[]
+  following        FollowedShop[]     @relation("UserFollows")
+  followers        FollowedShop[]     @relation("PartnerFollowed")
+  conversationsAsUser    Conversation[] @relation("UserConversations")
+  conversationsAsPartner Conversation[] @relation("PartnerConversations")
+  sentMessages    Message[]
 }
 
 model Category {
@@ -106,7 +117,10 @@ model Product {
   orderItems  OrderItem[]
   reviews     Review[]
   cartItems   CartItem[]
+  wishlistItems   WishlistItem[]
   recommendations Recommendation[]
+  flashSaleProducts FlashSaleProduct[]
+  variants          ProductVariant[]
 }
 
 model Order {
@@ -122,11 +136,16 @@ model Order {
   shippingAddress String
   phone          String
   note           String?
+  couponId       String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
   user        User        @relation(fields: [userId], references: [id])
   orderItems  OrderItem[]
+  coupon      Coupon?     @relation(fields: [couponId], references: [id])
+  couponUsages CouponUsage[]
+  refunds       Refund[]
+  conversations Conversation[]
 }
 
 model OrderItem {
@@ -158,6 +177,20 @@ model Review {
   productId String
   rating    Int
   comment   String?
+  reply     String?  // Phản hồi từ người bán/admin
+  repliedAt DateTime?
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([userId, productId])
+}
+
+model WishlistItem {
+  id        String   @id @default(uuid())
+  userId    String
+  productId String
   createdAt DateTime @default(now())
 
   user    User    @relation(fields: [userId], references: [id])
@@ -204,6 +237,43 @@ model Recommendation {
   product Product  @relation(fields: [productId], references: [id])
 }
 
+model Coupon {
+  id             String    @id @default(uuid())
+  code           String    @unique
+  type           String    // PERCENTAGE | FIXED
+  value          Float     // 10 = 10% or 50000 = 50K
+  minOrderValue  Float?    // Minimum order value to apply
+  maxDiscount    Float?    // Max discount for percentage type
+  usageLimit     Int?      // Total usage limit
+  usedCount      Int       @default(0)
+  perUserLimit   Int       @default(1)
+  startsAt       DateTime?
+  expiresAt      DateTime?
+  isActive       Boolean   @default(true)
+  description    String?
+  createdById    String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  createdBy User          @relation(fields: [createdById], references: [id])
+  orders    Order[]
+  usage     CouponUsage[]
+}
+
+model CouponUsage {
+  id        String   @id @default(uuid())
+  couponId  String
+  userId    String
+  orderId   String?
+  usedAt    DateTime @default(now())
+
+  coupon Coupon @relation(fields: [couponId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+  order  Order? @relation(fields: [orderId], references: [id])
+
+  @@unique([couponId, userId, orderId])
+}
+
 model Notification {
   id          String   @id @default(uuid())
   type        String   // ORDER, SYSTEM
@@ -219,4 +289,174 @@ model SiteSetting {
   key       String   @unique
   value     String   // JSON string for complex values
   updatedAt DateTime @updatedAt
+}
+
+// ─── Address: Nhiều địa chỉ giao hàng cho User ───
+model Address {
+  id         String   @id @default(uuid())
+  userId     String
+  label      String?  // Nhà, Cơ quan, v.v.
+  fullName   String?
+  phone      String?
+  street     String
+  ward       String?
+  district   String?
+  city       String
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+// ─── Refund: Yêu cầu hoàn trả ───
+model Refund {
+  id            String   @id @default(uuid())
+  orderId       String
+  userId        String
+  reason        String   // Lý do hoàn trả
+  description   String?  // Mô tả chi tiết
+  images        String[] // Ảnh minh chứng
+  amount        Float    // Số tiền yêu cầu hoàn
+  status        String   @default("PENDING") // PENDING, APPROVED, REJECTED, REFUNDED
+  adminReply    String?  // Phản hồi từ Admin
+  resolvedAt    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+}
+
+// ─── AuditLog: Lịch sử hành động quan trọng ───
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String
+  action     String   // CREATE, UPDATE, DELETE, APPROVE, BAN, etc.
+  entity     String   // USER, PRODUCT, ORDER, COUPON, etc.
+  entityId   String?
+  details    String?  // JSON string with extra info
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+// ─── Banner: Banner trang chủ ───
+model Banner {
+  id          String   @id @default(uuid())
+  title       String?
+  subtitle    String?
+  imageUrl    String
+  linkUrl     String?
+  linkText    String?
+  position    Int      @default(0)  // Thứ tự hiển thị
+  isActive    Boolean  @default(true)
+  bgColor     String?  // Màu nền (optional)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── FlashSale: Sự kiện Flash Sale ───
+model FlashSale {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  bannerUrl   String?
+  startTime   DateTime
+  endTime     DateTime
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  products FlashSaleProduct[]
+}
+
+model FlashSaleProduct {
+  id         String  @id @default(uuid())
+  flashSaleId String
+  productId  String
+  salePrice  Float   // Giá flash sale
+  maxQuantity Int     @default(0)  // Số lượng tối đa cho flash sale
+  soldCount  Int     @default(0)
+
+  flashSale FlashSale @relation(fields: [flashSaleId], references: [id])
+  product   Product   @relation(fields: [productId], references: [id])
+
+  @@unique([flashSaleId, productId])
+}
+
+// ─── Violation: Vi phạm shop/sản phẩm ───
+model Violation {
+  id          String   @id @default(uuid())
+  reportedById String  // Người báo cáo
+  targetId    String   // ID shop (user) hoặc sản phẩm
+  targetType  String   // SHOP, PRODUCT
+  reason      String
+  description String?
+  evidence    String[] // Ảnh/video bằng chứng
+  status      String   @default("PENDING") // PENDING, INVESTIGATING, RESOLVED, DISMISSED
+  penalty     String?  // WARNING, SUSPEND, BAN
+  resolvedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── FollowedShop: Theo dõi shop ───
+model FollowedShop {
+  id        String   @id @default(uuid())
+  userId    String   // User theo dõi
+  partnerId String   // Shop được theo dõi
+  createdAt DateTime @default(now())
+
+  user    User @relation("UserFollows", fields: [userId], references: [id])
+  partner User @relation("PartnerFollowed", fields: [partnerId], references: [id])
+
+  @@unique([userId, partnerId])
+}
+
+// ─── ProductVariant: Biến thể sản phẩm ───
+model ProductVariant {
+  id        String  @id @default(uuid())
+  productId String
+  name      String  // VD: "Đỏ", "XL", "32GB"
+  type      String  // color, size, storage, etc.
+  price     Float?  // Giá riêng cho biến thể (nếu khác)
+  stock     Int     @default(0)
+  image     String? // Ảnh riêng cho biến thể
+  sku       String? // Mã SKU
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([productId, name, type])
+}
+
+// ─── Conversation & Message: Chat giữa User và Partner ───
+model Conversation {
+  id        String   @id @default(uuid())
+  userId    String
+  partnerId String
+  orderId   String?  // Liên kết với đơn hàng (nếu có)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User     @relation("UserConversations", fields: [userId], references: [id])
+  partner User     @relation("PartnerConversations", fields: [partnerId], references: [id])
+  order   Order?   @relation(fields: [orderId], references: [id])
+  messages Message[]
+
+  @@unique([userId, partnerId])
+}
+
+model Message {
+  id             String   @id @default(uuid())
+  conversationId String
+  senderId       String
+  content        String
+  images         String[]
+  isRead         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  sender       User         @relation(fields: [senderId], references: [id])
 }

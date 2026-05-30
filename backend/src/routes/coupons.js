@@ -1,0 +1,25 @@
+const express = require('express');
+const router = express.Router();
+const {
+  getAllCoupons,
+  createCoupon,
+  updateCoupon,
+  deleteCoupon,
+  getMyCoupons,
+  validateCoupon,
+} = require('../controllers/couponController');
+const { protect, restrictTo } = require('../middleware/auth');
+
+// Customer routes
+router.post('/validate', protect, validateCoupon);
+
+// Partner routes - quản lý coupon của mình
+router.get('/my', protect, restrictTo('PARTNER'), getMyCoupons);
+router.post('/', protect, restrictTo('PARTNER', 'ADMIN'), createCoupon);
+router.put('/:id', protect, restrictTo('PARTNER', 'ADMIN'), updateCoupon);
+router.delete('/:id', protect, restrictTo('PARTNER', 'ADMIN'), deleteCoupon);
+
+// Admin routes - quản lý tất cả coupon
+router.get('/', protect, restrictTo('ADMIN'), getAllCoupons);
+
+module.exports = router;

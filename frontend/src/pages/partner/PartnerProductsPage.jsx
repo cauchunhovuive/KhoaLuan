@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiPackage, FiDollarSign, FiEye } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiPackage, FiDollarSign, FiEye, FiToggleLeft, FiToggleRight } from 'react-icons/fi';
 import api from '../../services/api';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import toast from 'react-hot-toast';
@@ -56,10 +56,10 @@ const PartnerProductsPage = () => {
       };
 
       if (editingProduct) {
-        await api.put(`/products/${editingProduct.id}`, payload);
+        await api.put(`/partner/products/${editingProduct.id}`, payload);
         toast.success('Cập nhật sản phẩm thành công');
       } else {
-        await api.post('/products', payload);
+        await api.post('/partner/products', payload);
         toast.success('Thêm sản phẩm thành công');
       }
 
@@ -86,11 +86,21 @@ const PartnerProductsPage = () => {
     setShowForm(true);
   };
 
+  const handleToggleActive = async (product) => {
+    try {
+      await api.put(`/partner/products/${product.id}`, { isActive: !product.isActive });
+      toast.success(product.isActive ? 'Đã ẩn sản phẩm' : 'Đã đăng bán sản phẩm');
+      fetchProducts();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Lỗi khi cập nhật');
+    }
+  };
+
   const handleDelete = async (id) => {
     if (!window.confirm('Bạn có chắc muốn xoá sản phẩm này?')) return;
     try {
-      await api.delete(`/products/${id}`);
-      toast.success('Xoá sản phẩm thành công');
+      await api.delete(`/partner/products/${id}`);
+      toast.success('Đã ẩn sản phẩm');
       fetchProducts();
     } catch (err) {
       toast.error('Lỗi khi xoá sản phẩm');
@@ -268,6 +278,11 @@ const PartnerProductsPage = () => {
                     </div>
                   </div>
                   <div className="flex items-center space-x-2 ml-4">
+                    <button onClick={() => handleToggleActive(product)}
+                      className={`p-2 rounded-lg transition-colors ${product.isActive ? 'text-emerald-600 hover:bg-emerald-50' : 'text-gray-400 hover:bg-gray-100'}`}
+                      title={product.isActive ? 'Tạm ẩn' : 'Đăng bán'}>
+                      {product.isActive ? <FiToggleRight size={16} /> : <FiToggleLeft size={16} />}
+                    </button>
                     <button onClick={() => handleEdit(product)} className="p-2 text-ink-secondary hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Sửa">
                       <FiEdit2 size={15} />
                     </button>

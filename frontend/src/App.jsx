@@ -18,6 +18,10 @@ import OrdersPage from './pages/OrdersPage';
 import OrderDetailPage from './pages/OrderDetailPage';
 import ProfilePage from './pages/ProfilePage';
 import SearchPage from './pages/SearchPage';
+import WishlistPage from './pages/WishlistPage';
+import AddressManagementPage from './pages/AddressManagementPage';
+import UserChatPage from './pages/UserChatPage';
+import FollowedShopsPage from './pages/FollowedShopsPage';
 
 // Admin pages
 import DashboardPage from './pages/admin/DashboardPage';
@@ -28,16 +32,23 @@ import UsersManagePage from './pages/admin/UsersManagePage';
 import ClustersPage from './pages/admin/ClustersPage';
 import RecommendationsPage from './pages/admin/RecommendationsPage';
 import SettingsPage from './pages/admin/SettingsPage';
+import PartnersManagePage from './pages/admin/PartnersManagePage';
+import CouponsPage from './pages/admin/CouponsPage';
+import BannerManagementPage from './pages/admin/BannerManagementPage';
+import FlashSaleManagementPage from './pages/admin/FlashSaleManagementPage';
+import RefundManagementPage from './pages/admin/RefundManagementPage';
+import ViolationManagementPage from './pages/admin/ViolationManagementPage';
+import AuditLogPage from './pages/admin/AuditLogPage';
 
 // Partner pages
 import PartnerLayout from './components/Layout/PartnerLayout';
 import PartnerDashboardPage from './pages/partner/PartnerDashboardPage';
 import PartnerProductsPage from './pages/partner/PartnerProductsPage';
 import PartnerOrdersPage from './pages/partner/PartnerOrdersPage';
+import PartnerReviewsPage from './pages/partner/PartnerReviewsPage';
+import PartnerCouponsPage from './pages/partner/PartnerCouponsPage';
 import PartnerProfilePage from './pages/partner/PartnerProfilePage';
-
-// Admin partner pages
-import PartnersManagePage from './pages/admin/PartnersManagePage';
+import PartnerChatPage from './pages/partner/PartnerChatPage';
 
 const ProtectedRoute = ({ children, adminOnly = false }) => {
   const { isAuthenticated, user } = useSelector((state) => state.auth);
@@ -91,20 +102,36 @@ function App() {
         <Route path="profile" element={
           <ProtectedRoute><ProfilePage /></ProtectedRoute>
         } />
+        <Route path="wishlist" element={
+          <ProtectedRoute><WishlistPage /></ProtectedRoute>
+        } />
+        <Route path="addresses" element={
+          <ProtectedRoute><AddressManagementPage /></ProtectedRoute>
+        } />
+        <Route path="chat" element={
+          <ProtectedRoute><UserChatPage /></ProtectedRoute>
+        } />
+        <Route path="followed-shops" element={
+          <ProtectedRoute><FollowedShopsPage /></ProtectedRoute>
+        } />
       </Route>
 
-      {/* Auth routes */}        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+      {/* Auth routes */}
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
 
-        {/* Partner routes */}
-        <Route path="/partner" element={
-          <PartnerRoute><PartnerLayout /></PartnerRoute>
-        }>
-          <Route index element={<PartnerDashboardPage />} />
-          <Route path="products" element={<PartnerProductsPage />} />
-          <Route path="orders" element={<PartnerOrdersPage />} />
-          <Route path="profile" element={<PartnerProfilePage />} />
-        </Route>
+      {/* Partner routes */}
+      <Route path="/partner" element={
+        <PartnerRoute><PartnerLayout /></PartnerRoute>
+      }>
+        <Route index element={<PartnerDashboardPage />} />
+        <Route path="products" element={<PartnerProductsPage />} />
+        <Route path="orders" element={<PartnerOrdersPage />} />
+        <Route path="reviews" element={<PartnerReviewsPage />} />
+        <Route path="coupons" element={<PartnerCouponsPage />} />
+        <Route path="chat" element={<PartnerChatPage />} />
+        <Route path="profile" element={<PartnerProfilePage />} />
+      </Route>
 
       {/* Admin routes */}
       <Route path="/admin" element={
@@ -116,6 +143,12 @@ function App() {
         <Route path="orders" element={<OrdersManagePage />} />
         <Route path="users" element={<UsersManagePage />} />
         <Route path="partners" element={<PartnersManagePage />} />
+        <Route path="coupons" element={<CouponsPage />} />
+        <Route path="banners" element={<BannerManagementPage />} />
+        <Route path="flash-sales" element={<FlashSaleManagementPage />} />
+        <Route path="refunds" element={<RefundManagementPage />} />
+        <Route path="violations" element={<ViolationManagementPage />} />
+        <Route path="audit" element={<AuditLogPage />} />
         <Route path="clusters" element={<ClustersPage />} />
         <Route path="recommendations" element={<RecommendationsPage />} />
         <Route path="settings" element={<SettingsPage />} />

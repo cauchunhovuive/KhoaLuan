@@ -194,6 +194,34 @@ const logout = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Đăng xuất thành công' });
 });
 
+// @desc    Change password
+// @route   PUT /api/auth/change-password
+const changePassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    throw new AppError('Vui lòng nhập mật khẩu hiện tại và mật khẩu mới', 400);
+  }
+
+  if (newPassword.length < 6) {
+    throw new AppError('Mật khẩu mới phải có ít nhất 6 ký tự', 400);
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+  const isMatch = await bcrypt.compare(currentPassword, user.password);
+  if (!isMatch) {
+    throw new AppError('Mật khẩu hiện tại không đúng', 401);
+  }
+
+  const hashedPassword = await bcrypt.hash(newPassword, 12);
+  await prisma.user.update({
+    where: { id: req.user.id },
+    data: { password: hashedPassword },
+  });
+
+  res.json({ success: true, message: 'Đổi mật khẩu thành công' });
+});
+
 module.exports = {
   register,
   login,
@@ -201,4 +229,5 @@ module.exports = {
   getMe,
   updateProfile,
   logout,
+  changePassword,
 };

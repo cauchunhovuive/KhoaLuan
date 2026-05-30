@@ -137,4 +137,99 @@ const deleteReview = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Đánh giá đã được xóa' });
 });
 
-module.exports = { getProductReviews, createReview, deleteReview };
+// @desc    Reply to review (Partner/Admin)
+// @route   PUT /api/reviews/:id/reply
+const replyReview = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { reply } = req.body;
+
+  if (!reply || !reply.trim()) {
+    throw new AppError('Nội dung phản hồi không được để trống', 400);
+  }
+
+  const review = await prisma.review.findUnique({
+    where: { id },
+    include: {
+      product: { select: { id: true, name: true, partnerId: true } },
+    },
+  });
+
+  if (!review) throw new AppError('Đánh giá không tồn tại', 404);
+
+  // Partner chỉ có thể phản hồi đánh giá sản phẩm của mình
+  if (req.user.role === 'PARTNER' && review.product.partnerId !== req.user.id) {
+    throw new AppError('Bạn không có quyền phản hồi đánh giá này', 403);
+  }
+
+  const updated = await prisma.review.update({
+    where: { id },
+    data: { reply: reply.trim(), repliedAt: new Date() },
+    include: {
+      user: { select: { id: true, name: true, avatar: true } },
+      product: { select: { id: true, name: true } },
+    },
+  });
+
+  res.json({ success: true, data: updated });
+});
+
+// @desc    Get reviews for partner's products
+// @route   GET /api/reviews/partner
+const getPartnerReviews = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 20 } = req.query;
+  const partnerId = req.user.id;
+
+  const where = {
+    product: { partnerId },
+  };
+
+  const [reviews, total] = await Promise.all([
+    prisma.review.findMany({
+      where,
+      include: {
+        user: { select: { id: true, name: true, avatar: true } },
+        product: { select: { id: true, name: true, images: true, slug: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      skip: (parseInt(page) - 1) * parseInt(limit),
+      take: parseInt(limit),
+    }),
+    prisma.review.count({ where }),
+  ]);
+
+  // Stats
+  const aggregation = await prisma.review.aggregate({
+    where,
+    _avg: { rating: true },
+    _count: true,
+  });
+
+  const distribution = await prisma.review.groupBy({
+    by: ['rating'],
+    where,
+    _count: true,
+  });
+
+  const ratingDist = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  distribution.forEach((d) => { ratingDist[d.rating] = d._count; });
+
+  res.json({
+    success: true,
+    data: {
+      reviews,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages: Math.ceil(total / parseInt(limit)),
+      },
+      stats: {
+        averageRating: aggregation._avg.rating || 0,
+        totalReviews: aggregation._count,
+        ratingDistribution: ratingDist,
+      },
+    },
+  });
+});
+
+module.exports = { getProductReviews, createReview, deleteReview, replyReview, getPartnerReviews };

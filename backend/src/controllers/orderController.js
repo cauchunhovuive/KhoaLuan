@@ -1,11 +1,12 @@
 const { prisma } = require('../config/database');
 const AppError = require('../utils/AppError');
 const asyncHandler = require('../utils/asyncHandler');
+const { applyCouponToOrder } = require('./couponController');
 
 // @desc    Create order from cart
 // @route   POST /api/orders
 const createOrder = asyncHandler(async (req, res) => {
-  const { shippingAddress, phone, note, paymentMethod } = req.body;
+  const { shippingAddress, phone, note, paymentMethod, couponCode } = req.body;
   const userId = req.user.id;
 
   const cartItems = await prisma.cartItem.findMany({
@@ -25,11 +26,25 @@ const createOrder = asyncHandler(async (req, res) => {
   }
 
   const subtotal = cartItems.reduce(
-    (sum, item) => sum + item.product.price * item.quantity,
+    (sum, item) => sum + (item.product.discountPrice || item.product.price) * item.quantity,
     0
   );
   const shippingFee = subtotal >= 500000 ? 0 : 30000;
-  const finalAmount = subtotal + shippingFee;
+
+  // Apply coupon if provided
+  let coupon = null;
+  let discountAmount = 0;
+  if (couponCode && couponCode.trim()) {
+    try {
+      const result = await applyCouponToOrder(couponCode, userId, subtotal);
+      coupon = result.coupon;
+      discountAmount = result.discountAmount;
+    } catch (err) {
+      throw new AppError(err.message, 400);
+    }
+  }
+
+  const finalAmount = Math.max(0, subtotal + shippingFee - discountAmount);
 
   const order = await prisma.$transaction(async (tx) => {
     // Create order
@@ -38,16 +53,18 @@ const createOrder = asyncHandler(async (req, res) => {
         userId,
         totalAmount: subtotal,
         shippingFee,
+        discountAmount,
         finalAmount,
         shippingAddress,
         phone,
         note,
         paymentMethod,
+        couponId: coupon?.id || null,
         orderItems: {
           create: cartItems.map((item) => ({
             productId: item.productId,
             quantity: item.quantity,
-            price: item.product.price,
+            price: item.product.discountPrice || item.product.price,
           })),
         },
       },
@@ -78,6 +95,17 @@ const createOrder = asyncHandler(async (req, res) => {
       },
     });
 
+    // Record coupon usage
+    if (coupon) {
+      await tx.coupon.update({
+        where: { id: coupon.id },
+        data: { usedCount: { increment: 1 } },
+      });
+      await tx.couponUsage.create({
+        data: { couponId: coupon.id, userId, orderId: newOrder.id },
+      });
+    }
+
     return newOrder;
   });
 
@@ -86,7 +114,7 @@ const createOrder = asyncHandler(async (req, res) => {
     data: {
       type: 'ORDER',
       title: 'Đơn hàng mới',
-      message: `Đơn hàng #${order.id.slice(0, 8)} - ${order.finalAmount.toLocaleString('vi-VN')}₫ từ ${req.user.name}`,
+      message: `Đơn hàng #${order.id.slice(0, 8)} - ${order.finalAmount.toLocaleString('vi-VN')}₫ từ ${req.user.name}${coupon ? ' (có mã giảm giá)' : ''}`,
       referenceId: order.id,
     },
   });
@@ -115,6 +143,7 @@ const getMyOrders = asyncHandler(async (req, res) => {
             product: { select: { id: true, name: true, images: true, slug: true } },
           },
         },
+        coupon: { select: { id: true, code: true, type: true, value: true } },
       },
     }),
     prisma.order.count({ where }),
@@ -139,6 +168,7 @@ const getOrder = asyncHandler(async (req, res) => {
           product: { select: { id: true, name: true, images: true, price: true, slug: true, partnerId: true } },
         },
       },
+      coupon: { select: { id: true, code: true, type: true, value: true } },
     },
   });
 
@@ -236,6 +266,7 @@ const getAllOrders = asyncHandler(async (req, res) => {
         orderItems: {
           include: { product: { select: { id: true, name: true, images: true } } },
         },
+        coupon: { select: { id: true, code: true, type: true, value: true } },
       },
     }),
     prisma.order.count({ where }),
@@ -247,4 +278,56 @@ const getAllOrders = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { createOrder, getMyOrders, getOrder, cancelOrder, updateOrderStatus, getAllOrders };
+// @desc    Confirm delivery (User)
+// @route   PUT /api/orders/:id/confirm
+const confirmDelivery = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const order = await prisma.order.findUnique({ where: { id } });
+
+  if (!order) throw new AppError('Đơn hàng không tồn tại', 404);
+  if (order.userId !== req.user.id) throw new AppError('Bạn không có quyền xác nhận đơn này', 403);
+  if (order.status !== 'SHIPPING') throw new AppError('Đơn hàng chưa được giao', 400);
+
+  const updated = await prisma.order.update({
+    where: { id },
+    data: { status: 'DELIVERED' },
+  });
+
+  res.json({ success: true, data: updated });
+});
+
+// @desc    Re-buy (User purchases same items from a previous order)
+// @route   POST /api/orders/:id/rebuy
+const reBuy = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const order = await prisma.order.findUnique({
+    where: { id },
+    include: { orderItems: { include: { product: true } } },
+  });
+
+  if (!order) throw new AppError('Đơn hàng không tồn tại', 404);
+  if (order.userId !== req.user.id) throw new AppError('Bạn không có quyền mua lại đơn này', 403);
+
+  // Add items back to cart
+  for (const item of order.orderItems) {
+    if (item.product.isActive && item.product.stock > 0) {
+      const existing = await prisma.cartItem.findUnique({
+        where: { userId_productId: { userId: req.user.id, productId: item.productId } },
+      });
+      if (existing) {
+        await prisma.cartItem.update({
+          where: { id: existing.id },
+          data: { quantity: Math.min(existing.quantity + item.quantity, item.product.stock) },
+        });
+      } else {
+        await prisma.cartItem.create({
+          data: { userId: req.user.id, productId: item.productId, quantity: Math.min(item.quantity, item.product.stock) },
+        });
+      }
+    }
+  }
+
+  res.json({ success: true, message: 'Sản phẩm đã được thêm vào giỏ hàng' });
+});
+
+module.exports = { createOrder, getMyOrders, getOrder, cancelOrder, updateOrderStatus, getAllOrders, confirmDelivery, reBuy };

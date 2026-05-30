@@ -2,7 +2,7 @@ import React from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
-  FiHome, FiPackage, FiShoppingBag, FiLogOut, FiChevronLeft, FiMenu, FiAlertCircle, FiSettings,
+  FiHome, FiPackage, FiShoppingBag, FiLogOut, FiChevronLeft, FiMenu, FiAlertCircle, FiSettings, FiStar, FiTag, FiMessageSquare,
 } from 'react-icons/fi';
 import { logout } from '../../store/authSlice';
 
@@ -10,6 +10,9 @@ const sidebarItems = [
   { icon: FiHome, label: 'Dashboard', path: '/partner' },
   { icon: FiPackage, label: 'Sản phẩm', path: '/partner/products' },
   { icon: FiShoppingBag, label: 'Đơn hàng', path: '/partner/orders' },
+  { icon: FiStar, label: 'Đánh giá', path: '/partner/reviews' },
+  { icon: FiTag, label: 'Mã giảm giá', path: '/partner/coupons' },
+  { icon: FiMessageSquare, label: 'Tin nhắn', path: '/partner/chat' },
   { icon: FiSettings, label: 'Cài đặt cửa hàng', path: '/partner/profile' },
 ];
 

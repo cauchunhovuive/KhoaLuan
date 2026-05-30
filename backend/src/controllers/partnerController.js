@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { prisma } = require('../config/database');
+const { cacheDel } = require('../config/redis');
 const AppError = require('../utils/AppError');
 const asyncHandler = require('../utils/asyncHandler');
 
@@ -116,18 +117,6 @@ const getPartnerDashboard = asyncHandler(async (req, res) => {
     }),
   ]);
 
-  // Đếm số đơn theo từng trạng thái cho sản phẩm của partner
-  const orderStatusStats = await prisma.orderItem.groupBy({
-    by: ['orderId'],
-    where: { product: { partnerId: userId } },
-  });
-  const orderIds = orderStatusStats.map((o) => o.orderId);
-  const statusCounts = await prisma.order.groupBy({
-    by: ['status'],
-    where: { id: { in: orderIds } },
-    _count: true,
-  });
-
   res.json({
     success: true,
     data: {
@@ -137,7 +126,6 @@ const getPartnerDashboard = asyncHandler(async (req, res) => {
         totalRevenue: totalRevenue._sum.price || 0,
         activeProducts,
       },
-      orderStatusStats: statusCounts.map((s) => ({ status: s.status, count: s._count })),
       recentOrders,
     },
   });
@@ -172,6 +160,91 @@ const getPartnerProducts = asyncHandler(async (req, res) => {
       },
     },
   });
+});
+
+// @desc    Partner create product (self-managed, no admin approval needed)
+// @route   POST /api/partner/products
+const createPartnerProduct = asyncHandler(async (req, res) => {
+  const { name, description, price, discountPrice, images, stock, categoryId } = req.body;
+
+  if (!req.user.isApproved) {
+    throw new AppError('Tài khoản đối tác chưa được phê duyệt', 403);
+  }
+
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+  const product = await prisma.product.create({
+    data: {
+      name,
+      slug,
+      description,
+      price,
+      discountPrice: discountPrice || null,
+      images: images?.length ? images : ['https://picsum.photos/seed/default/400/400'],
+      stock: stock || 0,
+      categoryId,
+      partnerId: req.user.id,
+      isActive: true,
+    },
+    include: { category: { select: { id: true, name: true } } },
+  });
+
+  await cacheDel('products:*');
+
+  res.status(201).json({ success: true, data: product });
+});
+
+// @desc    Partner update product (own products only)
+// @route   PUT /api/partner/products/:id
+const updatePartnerProduct = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id;
+  const { name, description, price, discountPrice, images, stock, categoryId, isActive } = req.body;
+
+  const existing = await prisma.product.findUnique({ where: { id } });
+  if (!existing) throw new AppError('Sản phẩm không tồn tại', 404);
+  if (existing.partnerId !== userId) throw new AppError('Bạn không có quyền sửa sản phẩm này', 403);
+
+  const data = {};
+  if (name) { data.name = name; data.slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''); }
+  if (description !== undefined) data.description = description;
+  if (price !== undefined) data.price = price;
+  if (discountPrice !== undefined) data.discountPrice = discountPrice || null;
+  if (images) data.images = images;
+  if (stock !== undefined) data.stock = stock;
+  if (categoryId) data.categoryId = categoryId;
+  if (isActive !== undefined) data.isActive = isActive;
+
+  const product = await prisma.product.update({
+    where: { id },
+    data,
+    include: { category: { select: { id: true, name: true } } },
+  });
+
+  await cacheDel(`product:${id}`);
+
+  res.json({ success: true, data: product });
+});
+
+// @desc    Partner delete/deactivate product (own products only)
+// @route   DELETE /api/partner/products/:id
+const deletePartnerProduct = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id;
+
+  const existing = await prisma.product.findUnique({ where: { id } });
+  if (!existing) throw new AppError('Sản phẩm không tồn tại', 404);
+  if (existing.partnerId !== userId) throw new AppError('Bạn không có quyền xoá sản phẩm này', 403);
+
+  // Soft delete - just deactivate
+  await prisma.product.update({
+    where: { id },
+    data: { isActive: false },
+  });
+
+  await cacheDel(`product:${id}`);
+
+  res.json({ success: true, message: 'Sản phẩm đã được ẩn' });
 });
 
 // @desc    Get partner's orders (orders containing their products)
@@ -393,13 +466,86 @@ const updatePartnerProfile = asyncHandler(async (req, res) => {
   res.json({ success: true, data: user });
 });
 
+// @desc    Get partner revenue data for charts
+// @route   GET /api/partner/revenue
+const getPartnerRevenue = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { period = 'monthly', year = new Date().getFullYear() } = req.query;
+
+  const orders = await prisma.order.findMany({
+    where: {
+      orderItems: { some: { product: { partnerId: userId } } },
+      status: 'DELIVERED',
+      createdAt: {
+        gte: new Date(`${year}-01-01`),
+        lt: new Date(`${parseInt(year) + 1}-01-01`),
+      },
+    },
+    include: {
+      orderItems: {
+        where: { product: { partnerId: userId } },
+        select: { price: true, quantity: true, product: { select: { name: true, images: true } } },
+      },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  // Group by month
+  const monthlyData = Array.from({ length: 12 }, (_, i) => ({
+    month: i + 1,
+    revenue: 0,
+    orders: 0,
+  }));
+
+  orders.forEach((order) => {
+    const month = new Date(order.createdAt).getMonth();
+    monthlyData[month].revenue += order.orderItems.reduce(
+      (sum, item) => sum + item.price * item.quantity, 0
+    );
+    monthlyData[month].orders += 1;
+  });
+
+  // Top selling products
+  const productSales = {};
+  orders.forEach((order) => {
+    order.orderItems.forEach((item) => {
+      const name = item.product.name;
+      if (!productSales[name]) {
+        productSales[name] = { name, quantity: 0, revenue: 0, image: item.product.images?.[0] };
+      }
+      productSales[name].quantity += item.quantity;
+      productSales[name].revenue += item.price * item.quantity;
+    });
+  });
+
+  const topProducts = Object.values(productSales)
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 10);
+
+  res.json({
+    success: true,
+    data: {
+      monthlyRevenue: monthlyData.filter((m) => m.orders > 0),
+      topProducts,
+      totalRevenue: orders.reduce(
+        (sum, o) => sum + o.orderItems.reduce((s, i) => s + i.price * i.quantity, 0), 0
+      ),
+      totalOrders: orders.length,
+    },
+  });
+});
+
 module.exports = {
   registerPartner,
   getPartnerDashboard,
   getPartnerProducts,
+  createPartnerProduct,
+  updatePartnerProduct,
+  deletePartnerProduct,
   getPartnerOrders,
   updatePartnerOrderStatus,
   updatePartnerProfile,
   getAllPartners,
   approvePartner,
+  getPartnerRevenue,
 };

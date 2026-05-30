@@ -105,4 +105,51 @@ const deleteUser = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Người dùng đã bị vô hiệu hóa' });
 });
 
-module.exports = { getUsers, getUser, updateUser, deleteUser };
+// @desc    Follow a shop
+// @route   POST /api/users/follow
+const followShop = asyncHandler(async (req, res) => {
+  const { partnerId } = req.body;
+  if (!partnerId) throw new AppError('Thiếu thông tin shop', 400);
+
+  const partner = await prisma.user.findUnique({ where: { id: partnerId } });
+  if (!partner || partner.role !== 'PARTNER') throw new AppError('Shop không tồn tại', 404);
+
+  const existing = await prisma.followedShop.findUnique({
+    where: { userId_partnerId: { userId: req.user.id, partnerId } },
+  });
+  if (existing) throw new AppError('Bạn đã theo dõi shop này rồi', 400);
+
+  const follow = await prisma.followedShop.create({
+    data: { userId: req.user.id, partnerId },
+  });
+
+  res.status(201).json({ success: true, data: follow });
+});
+
+// @desc    Unfollow a shop
+// @route   DELETE /api/users/follow/:partnerId
+const unfollowShop = asyncHandler(async (req, res) => {
+  const { partnerId } = req.params;
+  const existing = await prisma.followedShop.findUnique({
+    where: { userId_partnerId: { userId: req.user.id, partnerId } },
+  });
+  if (!existing) throw new AppError('Bạn chưa theo dõi shop này', 404);
+
+  await prisma.followedShop.delete({ where: { id: existing.id } });
+  res.json({ success: true, message: 'Đã bỏ theo dõi shop' });
+});
+
+// @desc    Get user's followed shops
+// @route   GET /api/users/follow
+const getFollowedShops = asyncHandler(async (req, res) => {
+  const shops = await prisma.followedShop.findMany({
+    where: { userId: req.user.id },
+    include: {
+      partner: { select: { id: true, name: true, storeName: true, avatar: true, storeDescription: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+  res.json({ success: true, data: shops });
+});
+
+module.exports = { getUsers, getUser, updateUser, deleteUser, followShop, unfollowShop, getFollowedShops };

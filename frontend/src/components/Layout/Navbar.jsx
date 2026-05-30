@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { FiSearch, FiShoppingCart, FiUser, FiLogOut, FiMenu, FiX } from 'react-icons/fi';
+import { FiSearch, FiShoppingCart, FiUser, FiLogOut, FiMenu, FiX, FiHeart, FiMapPin, FiMessageSquare, FiHeart as FiHeartOutline } from 'react-icons/fi';
 import { logout } from '../../store/authSlice';
 
 const Navbar = () => {
@@ -61,6 +61,9 @@ const Navbar = () => {
               Sản phẩm
             </Link>
 
+            <Link to="/wishlist" className="relative p-2.5 text-ink-secondary hover:text-ink hover:bg-surface-tertiary rounded-xl transition-all duration-200">
+              <FiHeart className="text-lg" />
+            </Link>
             <Link to="/cart" className="relative p-2.5 text-ink-secondary hover:text-ink hover:bg-surface-tertiary rounded-xl transition-all duration-200">
               <FiShoppingCart className="text-lg" />
               {count > 0 && (
@@ -76,14 +79,28 @@ const Navbar = () => {
                   <FiUser className="text-lg" />
                   <span className="max-w-[100px] truncate">{user?.name || 'Tài khoản'}</span>
                 </button>
-                <div className="absolute right-0 mt-1.5 w-52 bg-white rounded-xl shadow-premium-lg border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 py-1.5 z-50">
+                <div className="absolute right-0 mt-1.5 w-56 bg-white rounded-xl shadow-premium-lg border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 py-1.5 z-50">
                   <Link to="/profile" className="block px-4 py-2 text-sm text-ink-secondary hover:text-ink hover:bg-surface-secondary transition-colors">
                     Thông tin cá nhân
                   </Link>
                   {(user?.role === 'CUSTOMER' || !user?.role) && (
-                    <Link to="/orders" className="block px-4 py-2 text-sm text-ink-secondary hover:text-ink hover:bg-surface-secondary transition-colors">
-                      Đơn hàng của tôi
-                    </Link>
+                    <>
+                      <Link to="/orders" className="block px-4 py-2 text-sm text-ink-secondary hover:text-ink hover:bg-surface-secondary transition-colors">
+                        Đơn hàng của tôi
+                      </Link>
+                      <Link to="/addresses" className="block px-4 py-2 text-sm text-ink-secondary hover:text-ink hover:bg-surface-secondary transition-colors">
+                        <FiMapPin className="inline mr-1.5 text-xs" />
+                        Địa chỉ giao hàng
+                      </Link>
+                      <Link to="/followed-shops" className="block px-4 py-2 text-sm text-ink-secondary hover:text-ink hover:bg-surface-secondary transition-colors">
+                        <FiHeartOutline className="inline mr-1.5 text-xs" />
+                        Cửa hàng yêu thích
+                      </Link>
+                      <Link to="/chat" className="block px-4 py-2 text-sm text-ink-secondary hover:text-ink hover:bg-surface-secondary transition-colors">
+                        <FiMessageSquare className="inline mr-1.5 text-xs" />
+                        Tin nhắn
+                      </Link>
+                    </>
                   )}
                   {user?.role === 'PARTNER' && (
                     <Link to="/partner" className="block px-4 py-2 text-sm text-emerald-600 hover:bg-surface-secondary transition-colors font-medium">
@@ -143,6 +160,9 @@ const Navbar = () => {
           <Link to="/products" className="block px-3 py-2.5 text-ink-secondary hover:text-ink hover:bg-surface-secondary rounded-xl transition-colors" onClick={() => setMobileMenuOpen(false)}>
             Sản phẩm
           </Link>
+          <Link to="/wishlist" className="block px-3 py-2.5 text-ink-secondary hover:text-ink hover:bg-surface-secondary rounded-xl transition-colors" onClick={() => setMobileMenuOpen(false)}>
+            Yêu thích
+          </Link>
           <Link to="/cart" className="block px-3 py-2.5 text-ink-secondary hover:text-ink hover:bg-surface-secondary rounded-xl transition-colors" onClick={() => setMobileMenuOpen(false)}>
             Giỏ hàng {count > 0 && <span className="ml-1 text-primary-600 font-medium">({count})</span>}
           </Link>
@@ -154,9 +174,20 @@ const Navbar = () => {
                 Thông tin cá nhân
               </Link>
               {(user?.role === 'CUSTOMER' || !user?.role) && (
-                <Link to="/orders" className="block px-3 py-2.5 text-ink-secondary hover:text-ink hover:bg-surface-secondary rounded-xl transition-colors" onClick={() => setMobileMenuOpen(false)}>
-                  Đơn hàng
-                </Link>
+                <>
+                  <Link to="/orders" className="block px-3 py-2.5 text-ink-secondary hover:text-ink hover:bg-surface-secondary rounded-xl transition-colors" onClick={() => setMobileMenuOpen(false)}>
+                    Đơn hàng
+                  </Link>
+                  <Link to="/addresses" className="block px-3 py-2.5 text-ink-secondary hover:text-ink hover:bg-surface-secondary rounded-xl transition-colors" onClick={() => setMobileMenuOpen(false)}>
+                    <FiMapPin className="inline mr-1.5" /> Địa chỉ
+                  </Link>
+                  <Link to="/followed-shops" className="block px-3 py-2.5 text-ink-secondary hover:text-ink hover:bg-surface-secondary rounded-xl transition-colors" onClick={() => setMobileMenuOpen(false)}>
+                    <FiHeartOutline className="inline mr-1.5" /> Cửa hàng yêu thích
+                  </Link>
+                  <Link to="/chat" className="block px-3 py-2.5 text-ink-secondary hover:text-ink hover:bg-surface-secondary rounded-xl transition-colors" onClick={() => setMobileMenuOpen(false)}>
+                    <FiMessageSquare className="inline mr-1.5" /> Tin nhắn
+                  </Link>
+                </>
               )}
               {user?.role === 'PARTNER' && (
                 <Link to="/partner" className="block px-3 py-2.5 text-emerald-600 font-medium hover:bg-surface-secondary rounded-xl transition-colors" onClick={() => setMobileMenuOpen(false)}>
