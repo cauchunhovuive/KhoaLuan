@@ -29,38 +29,37 @@ Hệ thống gồm **5 Docker services**: `postgres`, `redis`, `backend`, `ml-se
 
 | Nhánh | Vai trò | Mô tả |
 |-------|---------|-------|
-| 🔴 **Admin** | `ADMIN` | Quản trị hệ thống, quản lý tất cả |
-| 🟡 **Đối tác kinh doanh** | `PARTNER` | Đăng bán sản phẩm, quản lý đơn hàng |
+| 🔴 **Admin** | `ADMIN` | Quản trị hệ thống (không quản lý đơn hàng — partner tự xử lý) |
+| 🟡 **Đối tác kinh doanh** | `PARTNER` | Đăng bán sản phẩm, tự duyệt & xử lý đơn hàng của shop mình |
 | 🟢 **Khách hàng** | `CUSTOMER` | Mua sắm, đánh giá, theo dõi đơn hàng |
 
 ---
 
 ### 🔴 Admin — Quản trị viên
 
-Admin có toàn quyền quản lý hệ thống qua dashboard với các module:
+Admin có toàn quyền quản lý hệ thống qua dashboard. **Admin không quản lý đơn hàng** — mỗi partner tự xử lý đơn hàng của shop mình.
 
 | Module | Mô tả |
 |--------|-------|
-| 📊 **Dashboard** | Thống kê tổng quan (doanh thu, đơn hàng, người dùng, biểu đồ doanh số 30 ngày) |
-| 📦 **Quản lý sản phẩm** | CRUD sản phẩm, lọc, tìm kiếm, phân trang |
+| 📊 **Dashboard** | Thống kê tổng quan (người dùng, sản phẩm, đối tác, danh mục) |
+| 📦 **Quản lý sản phẩm** | CRUD sản phẩm, lọc, tìm kiếm, phân trang (10/trang) |
 | 🏷️ **Quản lý danh mục** | CRUD danh mục sản phẩm |
-| 📋 **Quản lý đơn hàng** | Xem tất cả đơn hàng, cập nhật trạng thái |
-| 👥 **Quản lý người dùng** | Xem, sửa, vô hiệu hóa người dùng |
+| 👥 **Quản lý người dùng** | Xem, sửa, phân quyền người dùng, phân trang (10/trang) |
 | 🤝 **Quản lý đối tác** | Phê duyệt / từ chối đối tác mới đăng ký |
 | 🎯 **Phân cụm khách hàng** | Tạo nhóm, chạy phân cụm K-Means/RFM qua ML Service |
 | 💡 **Gợi ý sản phẩm** | Xem gợi ý theo cụm khách hàng |
-| 🏆 **Mã giảm giá** | CRUD mã giảm giá, theo dõi lượt sử dụng |
+| 🏆 **Mã giảm giá** | CRUD mã giảm giá, theo dõi lượt sử dụng (10/trang) |
 | 🖼️ **Banner** | Quản lý banner trang chủ (vị trí, link, màu nền) |
 | ⚡ **Flash Sale** | Tạo sự kiện flash sale, thêm/xóa sản phẩm |
-| 💰 **Hoàn tiền** | Xử lý yêu cầu hoàn tiền từ khách hàng |
-| 🚨 **Vi phạm** | Xử lý báo cáo vi phạm shop/sản phẩm |
-| 📝 **Audit Log** | Xem lịch sử hành động quan trọng trong hệ thống |
+| 💰 **Hoàn tiền** | Xử lý yêu cầu hoàn tiền từ khách hàng (10/trang) |
+| 🚨 **Vi phạm** | Xử lý báo cáo vi phạm shop/sản phẩm (10/trang) |
+| 📝 **Audit Log** | Xem lịch sử hành động quan trọng trong hệ thống (10/trang) |
 | 🔔 **Thông báo** | Xem thông báo hệ thống (poll 30s) |
 | ⚙️ **Cài đặt** | Cấu hình hệ thống (tên site, phí ship, clustering...) |
 
 ### 🟡 Đối tác kinh doanh (Partner)
 
-Partner có không gian riêng với các tính năng:
+Partner có không gian riêng với các tính năng — **tự xử lý đơn hàng của shop mình**:
 
 | Tính năng | Mô tả |
 |-----------|-------|
@@ -68,11 +67,11 @@ Partner có không gian riêng với các tính năng:
 | ✅ **Chờ phê duyệt** | Admin phê duyệt trước khi có thể bán hàng |
 | 📊 **Dashboard đối tác** | Thống kê sản phẩm, đơn hàng, doanh thu |
 | 📈 **Doanh thu theo tháng** | Biểu đồ doanh thu, top sản phẩm bán chạy |
-| 📦 **Quản lý sản phẩm** | CRUD sản phẩm của riêng mình (tự tạo, không cần admin duyệt) |
-| 📋 **Quản lý đơn hàng** | Xem đơn hàng có chứa sản phẩm của mình |
+| 📦 **Quản lý sản phẩm** | CRUD sản phẩm của riêng mình (10/trang) |
+| 📋 **Quản lý đơn hàng** | Xem & xử lý đơn hàng có chứa sản phẩm của mình (10/trang) |
 | 🚚 **Cập nhật trạng thái** | Xác nhận → Đang giao → Đã giao |
-| ⭐ **Quản lý đánh giá** | Xem và phản hồi đánh giá sản phẩm |
-| 🏆 **Mã giảm giá** | Tạo mã giảm giá riêng cho shop |
+| ⭐ **Quản lý đánh giá** | Xem và phản hồi đánh giá sản phẩm (10/trang) |
+| 🏆 **Mã giảm giá** | Tạo mã giảm giá riêng cho shop (10/trang) |
 | 💬 **Chat với khách hàng** | Trao đổi trực tiếp với khách hàng |
 | ✏️ **Cập nhật hồ sơ** | Sửa thông tin cửa hàng |
 
@@ -81,10 +80,10 @@ Partner có không gian riêng với các tính năng:
 | Tính năng | Mô tả |
 |-----------|-------|
 | 🔐 **Đăng ký / Đăng nhập** | JWT access + refresh token |
-| 🔍 **Tìm kiếm & duyệt** | Sản phẩm theo danh mục, giá, đánh giá, tìm kiếm |
+| 🔍 **Tìm kiếm & duyệt** | Sản phẩm theo danh mục, giá, đánh giá, tìm kiếm (10/trang) |
 | 🛒 **Giỏ hàng** | Thêm, sửa, xóa sản phẩm trong giỏ |
 | 💳 **Đặt hàng** | Thanh toán COD / Banking / MoMo / VNPAY |
-| 📋 **Theo dõi đơn hàng** | Trạng thái: PENDING → CONFIRMED → SHIPPING → DELIVERED |
+| 📋 **Theo dõi đơn hàng** | Trạng thái: PENDING → CONFIRMED → SHIPPING → DELIVERED (10/trang) |
 | 🎫 **Mã giảm giá** | Áp dụng mã giảm giá khi đặt hàng |
 | ❤️ **Yêu thích** | Danh sách sản phẩm yêu thích |
 | 👥 **Theo dõi shop** | Theo dõi / bỏ theo dõi cửa hàng yêu thích |
@@ -132,7 +131,7 @@ docker-compose up -d
 
 # Kiểm tra logs backend đã seed xong chưa
 docker-compose logs -f backend
-# Khi thấy "✅ Seed hoàn tất!" là có thể dùng được
+# Khi thấy "✅ Khởi động hoàn tất!" là có thể dùng được
 ```
 
 Sau khi chạy:
@@ -147,7 +146,17 @@ Sau khi chạy:
 
 > **Lưu ý:** Seed chỉ chạy 1 lần khi chưa có dữ liệu. Nếu muốn seed lại:
 > ```bash
-> docker exec khoaluan-backend sh -c "node prisma/seed.js --force"
+> docker exec khoaluan-backend sh -c "node -e '
+>   const{PrismaClient}=require(\"@prisma/client\");
+>   const p=new PrismaClient();
+>   const tables=[\"CartItem\",\"WishlistItem\",\"Review\",\"OrderItem\",\"Order\",
+>     \"Recommendation\",\"ProductVariant\",\"Notification\",\"SiteSetting\",
+>     \"FollowedShop\",\"Address\",\"Refund\",\"AuditLog\",\"Message\",\"Conversation\",
+>     \"FlashSaleProduct\",\"FlashSale\",\"CouponUsage\",\"Coupon\",\"Violation\",
+>     \"ClusterRule\",\"Cluster\",\"Banner\",\"Product\",\"Category\",\"User\"];
+>   (async()=>{for(const t of tables)await p.\$executeRawUnsafe(\"TRUNCATE TABLE \\\"\"+t+\"\\\" CASCADE\")})()
+>   .then(()=>{console.log(\"Truncated\");return p.\$disconnect()})
+> ' && node prisma/seed.js && node prisma/seed-full.js && node prisma/seed-new-models.js"
 > ```
 
 ### Chạy không Docker (Development)
@@ -159,6 +168,8 @@ npm install
 npx prisma generate
 npx prisma db push
 node prisma/seed.js
+node prisma/seed-full.js
+node prisma/seed-new-models.js
 npm run dev
 
 # Frontend
@@ -181,15 +192,22 @@ npx expo start
 
 ### Tài khoản mặc định
 
-| Vai trò | Email | Mật khẩu |
-|---------|-------|----------|
-| 🔴 **Admin** | admin@khoaluan.com | admin123 |
-| 🟡 **Đối tác (đã duyệt)** | partner1@shop.com | partner123 |
-| 🟡 **Đối tác (đã duyệt)** | partner2@fashion.com | partner123 |
-| 🟡 **Đối tác (chờ duyệt)** | partner3@new.com | partner123 |
-| 🟢 **Khách hàng 1** | customer1@test.com | customer123 |
-| 🟢 **Khách hàng 2** | customer2@test.com | customer123 |
-| 🟢 **Khách hàng 3** | customer3@test.com | customer123 |
+| Vai trò | Email | Mật khẩu | Ghi chú |
+|---------|-------|----------|---------|
+| 🔴 **Admin** | admin@khoaluan.com | admin123 | Quản trị hệ thống |
+| 🟡 **Fashion House XYZ** | partner1@shop.com | partner123 | Đã duyệt — 9 SP |
+| 🟡 **Shop Điện Tử ABC** | partner2@fashion.com | partner123 | Đã duyệt — 12 SP |
+| 🟡 **Nội Thất ABC** | partner3@new.com | partner123 | **Chờ duyệt** |
+| 🟡 **Sports Zone Việt Nam** | partner4@sport.com | partner123 | Đã duyệt — 11 SP |
+| 🟡 **Beauty House** | partner5@beauty.com | partner123 | Đã duyệt — 11 SP |
+| 🟡 **Pet Mart Việt Nam** | partner6@pet.com | partner123 | Đã duyệt — 10 SP |
+| 🟡 **Nội Thất Xinh** | partner7@furniture.com | partner123 | Đã duyệt — 11 SP |
+| 🟡 **Mẹ & Bé Shop** | partner8@mebebe.com | partner123 | Đã duyệt — 10 SP |
+| 🟢 **Khách hàng 1** | customer1@test.com | customer123 | Có lịch sử mua hàng |
+| 🟢 **Khách hàng 2** | customer2@test.com | customer123 | Có lịch sử mua hàng |
+| 🟢 **Khách hàng 3** | customer3@test.com | customer123 | Có lịch sử mua hàng |
+
+Seed dữ liệu mở rộng tạo thêm **12 khách hàng** (customer4@ → customer15@test.com, mật khẩu `customer123`).
 
 ---
 
@@ -200,7 +218,7 @@ KHOALUAN/
 ├── backend/                              # Backend API (Node.js + Express + Prisma)
 │   ├── Dockerfile                        # Docker image cho backend
 │   ├── package.json                      # Dependencies
-│   ├── start.sh                          # Startup script (push schema + seed)
+│   ├── start.sh                          # Startup script (push schema → seed.js → seed-full.js → seed-new-models.js)
 │   ├── src/
 │   │   ├── app.js                        # Express app entry point + middleware setup
 │   │   ├── config/
@@ -209,7 +227,7 @@ KHOALUAN/
 │   │   │   └── logger.js                 # Winston logger
 │   │   ├── controllers/
 │   │   │   ├── authController.js         # Đăng ký, đăng nhập, refresh token, logout, profile
-│   │   │   ├── productController.js      # CRUD sản phẩm, featured, slug, Redis cache
+│   │   │   ├── productController.js      # CRUD sản phẩm, featured, slug, Redis cache, lọc theo partner
 │   │   │   ├── categoryController.js     # CRUD danh mục
 │   │   │   ├── orderController.js        # Tạo đơn, hủy, cập nhật, xác nhận, mua lại, coupon
 │   │   │   ├── cartController.js         # Giỏ hàng (thêm, sửa, xóa, clear)
@@ -224,7 +242,7 @@ KHOALUAN/
 │   │   │   ├── refundController.js       # Yêu cầu hoàn tiền (tạo, duyệt, từ chối)
 │   │   │   ├── violationController.js    # Báo cáo vi phạm (tạo, xử lý, phạt)
 │   │   │   ├── chatController.js         # Chat (hội thoại, tin nhắn, đánh dấu đã đọc)
-│   │   │   ├── dashboardController.js    # Thống kê admin (doanh thu, biểu đồ 30 ngày)
+│   │   │   ├── dashboardController.js    # Thống kê admin (users, products, partners, categories, clusters)
 │   │   │   ├── clusterController.js      # Phân cụm (CRUD cluster, chạy ML, thống kê)
 │   │   │   ├── recommendationController.js # Gợi ý (cá nhân hóa, trending, similar, cluster)
 │   │   │   ├── notificationController.js # Thông báo (list, đánh dấu đã đọc)
@@ -251,8 +269,9 @@ KHOALUAN/
 │   │       └── asyncHandler.js           # Async error wrapper
 │   ├── prisma/
 │   │   ├── schema.prisma                 # Database schema (20+ models)
-│   │   ├── seed.js                       # Seed dữ liệu mẫu (chỉ chạy 1 lần)
-│   │   └── seed-new-models.js            # Seed dữ liệu cho model mới
+│   │   ├── seed.js                       # Seed dữ liệu mẫu (base data)
+│   │   ├── seed-full.js                  # Seed dữ liệu mở rộng (partners, products, reviews, orders)
+│   │   └── seed-new-models.js            # Seed dữ liệu bổ sung (banners, flash sales, refunds, violations...)
 │   └── ml/                               # ML Service (Python)
 │       ├── Dockerfile.ml                 # Docker image cho ML service
 │       ├── requirements.txt              # Python dependencies
@@ -288,21 +307,21 @@ KHOALUAN/
 │       │   │   ├── Navbar.jsx            # Navigation 3 nhánh (user/partner/admin)
 │       │   │   ├── Footer.jsx            # Premium footer
 │       │   │   ├── MainLayout.jsx        # Layout khách hàng
-│       │   │   ├── AdminLayout.jsx       # Layout admin (sidebar quản lý)
+│       │   │   ├── AdminLayout.jsx       # Layout admin (sidebar — không có Đơn hàng)
 │       │   │   └── PartnerLayout.jsx     # Layout đối tác (sidebar riêng)
 │       │   └── common/
-│       │       ├── ProductCard.jsx       # Card sản phẩm premium
+│       │       ├── ProductCard.jsx       # Card sản phẩm premium (hiển thị tên shop)
 │       │       ├── LoadingSpinner.jsx    # Skeleton loading
 │       │       └── Pagination.jsx        # Phân trang
 │       └── pages/
 │           ├── HomePage.jsx              # Hero slider + features + banner + categories + flash sale + featured
-│           ├── ProductListPage.jsx       # Danh sách + filter sidebar (category, price, rating)
-│           ├── ProductDetailPage.jsx     # Chi tiết + reviews + similar products
+│           ├── ProductListPage.jsx       # Danh sách + filter sidebar (10/trang)
+│           ├── ProductDetailPage.jsx     # Chi tiết + reviews + shop info card
 │           ├── CartPage.jsx              # Giỏ hàng premium (coupon, summary)
 │           ├── CheckoutPage.jsx          # Thanh toán (địa chỉ, phương thức, coupon)
-│           ├── OrdersPage.jsx            # Đơn hàng của tôi (filter status)
+│           ├── OrdersPage.jsx            # Đơn hàng của tôi (filter status, 10/trang)
 │           ├── OrderDetailPage.jsx       # Chi tiết đơn hàng
-│           ├── SearchPage.jsx            # Tìm kiếm sản phẩm
+│           ├── SearchPage.jsx            # Tìm kiếm sản phẩm (10/trang)
 │           ├── WishlistPage.jsx          # Danh sách yêu thích
 │           ├── ProfilePage.jsx           # Thông tin cá nhân
 │           ├── AddressManagementPage.jsx # Quản lý địa chỉ giao hàng
@@ -312,27 +331,26 @@ KHOALUAN/
 │           │   ├── LoginPage.jsx         # Đăng nhập
 │           │   └── RegisterPage.jsx      # Đăng ký (khách hàng / đối tác)
 │           ├── admin/
-│           │   ├── DashboardPage.jsx     # Thống kê admin (chart, stats)
+│           │   ├── DashboardPage.jsx     # Thống kê (users, products, partners, categories, top products, clusters)
 │           │   ├── ProductsManagePage.jsx# Quản lý sản phẩm
 │           │   ├── CategoriesManagePage.jsx# Quản lý danh mục
-│           │   ├── OrdersManagePage.jsx  # Quản lý đơn hàng
-│           │   ├── UsersManagePage.jsx   # Quản lý người dùng
-│           │   ├── PartnersManagePage.jsx# Quản lý đối tác (approve/reject)
-│           │   ├── CouponsPage.jsx       # Mã giảm giá
+│           │   ├── UsersManagePage.jsx   # Quản lý người dùng (10/trang)
+│           │   ├── PartnersManagePage.jsx# Quản lý đối tác (10/trang)
+│           │   ├── CouponsPage.jsx       # Mã giảm giá (10/trang)
 │           │   ├── BannerManagementPage.jsx# Banner trang chủ
 │           │   ├── FlashSaleManagementPage.jsx# Flash sale
-│           │   ├── RefundManagementPage.jsx# Yêu cầu hoàn tiền
-│           │   ├── ViolationManagementPage.jsx# Vi phạm
-│           │   ├── AuditLogPage.jsx      # Audit log
+│           │   ├── RefundManagementPage.jsx# Yêu cầu hoàn tiền (10/trang)
+│           │   ├── ViolationManagementPage.jsx# Vi phạm (10/trang)
+│           │   ├── AuditLogPage.jsx      # Audit log (10/trang)
 │           │   ├── ClustersPage.jsx      # Phân cụm khách hàng
 │           │   ├── RecommendationsPage.jsx# Gợi ý sản phẩm
 │           │   └── SettingsPage.jsx      # Cài đặt hệ thống
 │           └── partner/
 │               ├── PartnerDashboardPage.jsx   # Dashboard đối tác (stats + chart)
-│               ├── PartnerProductsPage.jsx    # Quản lý sản phẩm của partner
-│               ├── PartnerOrdersPage.jsx      # Quản lý đơn hàng của partner
-│               ├── PartnerReviewsPage.jsx     # Đánh giá sản phẩm + phản hồi
-│               ├── PartnerCouponsPage.jsx     # Mã giảm giá của shop
+│               ├── PartnerProductsPage.jsx    # Quản lý sản phẩm (10/trang)
+│               ├── PartnerOrdersPage.jsx      # Quản lý đơn hàng (10/trang)
+│               ├── PartnerReviewsPage.jsx     # Đánh giá sản phẩm + phản hồi (10/trang)
+│               ├── PartnerCouponsPage.jsx     # Mã giảm giá (10/trang)
 │               ├── PartnerChatPage.jsx        # Chat với khách hàng
 │               └── PartnerProfilePage.jsx     # Cập nhật thông tin cửa hàng
 │
@@ -383,10 +401,10 @@ KHOALUAN/
 ### Products
 | Method | Endpoint | Mô tả | Auth |
 |--------|----------|-------|------|
-| GET | `/products` | Danh sách (pagination, filter theo category/price/rating/search/sort) | Public |
-| GET | `/products/featured` | Sản phẩm bán chạy (top 8) | Public |
-| GET | `/products/slug/:slug` | Chi tiết theo slug (kèm reviews) | Public |
-| GET | `/products/:id` | Chi tiết theo ID (có Redis cache) | Public |
+| GET | `/products` | Danh sách (pagination, filter theo category/price/rating/search/sort/**partner**) | Public |
+| GET | `/products/featured` | Sản phẩm bán chạy (top 8, kèm partner) | Public |
+| GET | `/products/slug/:slug` | Chi tiết theo slug (kèm partner, reviews) | Public |
+| GET | `/products/:id` | Chi tiết theo ID (có Redis cache, kèm partner) | Public |
 | POST | `/products` | Thêm sản phẩm | ADMIN / PARTNER |
 | PUT | `/products/:id` | Cập nhật (partner chỉ SP của mình) | ADMIN / PARTNER |
 | DELETE | `/products/:id` | Xóa (soft delete, partner chỉ SP của mình) | ADMIN / PARTNER |
@@ -412,13 +430,14 @@ KHOALUAN/
 | Method | Endpoint | Mô tả | Auth |
 |--------|----------|-------|------|
 | POST | `/orders` | Tạo đơn hàng (từ giỏ, có coupon) | Protected |
-| GET | `/orders` | Đơn hàng của tôi (filter status) | Protected |
-| GET | `/orders/admin/all` | Tất cả đơn hàng (admin) | ADMIN |
+| GET | `/orders` | Đơn hàng của tôi (filter status, 10/trang) | Protected |
 | GET | `/orders/:id` | Chi tiết (chủ đơn/admin/partner có SP) | Protected |
 | PUT | `/orders/:id/status` | Cập nhật trạng thái | ADMIN / PARTNER |
 | PUT | `/orders/:id/cancel` | Hủy đơn (khi PENDING) | Protected |
 | PUT | `/orders/:id/confirm` | Xác nhận đã nhận hàng | Protected |
 | POST | `/orders/:id/rebuy` | Mua lại (thêm SP vào giỏ) | Protected |
+
+> **Lưu ý:** Admin **không** có route `/orders/admin/all` để lấy tất cả đơn hàng. Partner tự xử lý đơn hàng của mình qua `/partner/orders`.
 
 ### Reviews
 | Method | Endpoint | Mô tả | Auth |
@@ -439,10 +458,10 @@ KHOALUAN/
 | POST | `/partner/products` | Thêm sản phẩm mới | PARTNER |
 | PUT | `/partner/products/:id` | Sửa sản phẩm | PARTNER |
 | DELETE | `/partner/products/:id` | Ẩn sản phẩm | PARTNER |
-| GET | `/partner/orders` | Đơn hàng có SP của partner | PARTNER |
+| GET | `/partner/orders` | Đơn hàng có SP của partner (10/trang) | PARTNER |
 | PUT | `/partner/orders/:id/status` | Cập nhật trạng thái đơn | PARTNER |
 | PUT | `/partner/profile` | Cập nhật thông tin cửa hàng | PARTNER |
-| GET | `/partner/admin/all` | Danh sách đối tác | ADMIN |
+| GET | `/partner/admin/all` | Danh sách đối tác (10/trang) | ADMIN |
 | PUT | `/partner/admin/:id/approve` | Duyệt/từ chối đối tác | ADMIN |
 
 ### Wishlist
@@ -459,7 +478,7 @@ KHOALUAN/
 |--------|----------|-------|------|
 | POST | `/coupons/validate` | Kiểm tra mã giảm giá (còn hạn, còn lượt) | Protected |
 | GET | `/coupons/my` | Mã giảm giá của partner | PARTNER |
-| GET | `/coupons` | Tất cả mã giảm giá (admin) | ADMIN |
+| GET | `/coupons` | Tất cả mã giảm giá (admin, 10/trang) | ADMIN |
 | POST | `/coupons` | Tạo mã giảm giá | ADMIN / PARTNER |
 | PUT | `/coupons/:id` | Cập nhật | ADMIN / PARTNER |
 | DELETE | `/coupons/:id` | Xóa | ADMIN / PARTNER |
@@ -506,26 +525,26 @@ KHOALUAN/
 |--------|----------|-------|------|
 | POST | `/refunds` | Tạo yêu cầu hoàn tiền | Protected |
 | GET | `/refunds/my` | Yêu cầu hoàn tiền của tôi | Protected |
-| GET | `/refunds` | Tất cả yêu cầu (admin) | ADMIN |
+| GET | `/refunds` | Tất cả yêu cầu (admin, 10/trang) | ADMIN |
 | PUT | `/refunds/:id` | Cập nhật trạng thái hoàn tiền | ADMIN |
 
 ### Violations
 | Method | Endpoint | Mô tả | Auth |
 |--------|----------|-------|------|
 | POST | `/violations` | Báo cáo vi phạm | Protected |
-| GET | `/violations` | Danh sách vi phạm | ADMIN |
+| GET | `/violations` | Danh sách vi phạm (admin, 10/trang) | ADMIN |
 | PUT | `/violations/:id` | Xử lý vi phạm (phạt, cảnh cáo) | ADMIN |
 
 ### Audit Log
 | Method | Endpoint | Mô tả | Auth |
 |--------|----------|-------|------|
-| GET | `/audit` | Lịch sử hành động (filter) | ADMIN |
+| GET | `/audit` | Lịch sử hành động (admin, 10/trang) | ADMIN |
 | POST | `/audit` | Ghi audit log thủ công | ADMIN |
 
 ### Users
 | Method | Endpoint | Mô tả | Auth |
 |--------|----------|-------|------|
-| GET | `/users` | Danh sách người dùng | ADMIN |
+| GET | `/users` | Danh sách người dùng (admin, 10/trang) | ADMIN |
 | GET | `/users/:id` | Chi tiết người dùng (kèm đơn hàng gần đây) | ADMIN |
 | PUT | `/users/:id` | Sửa người dùng | ADMIN |
 | DELETE | `/users/:id` | Vô hiệu hóa người dùng | ADMIN |
@@ -536,7 +555,7 @@ KHOALUAN/
 ### Dashboard
 | Method | Endpoint | Mô tả | Auth |
 |--------|----------|-------|------|
-| GET | `/dashboard/stats` | Thống kê tổng quan (doanh thu, đơn hàng, cluster) | ADMIN |
+| GET | `/dashboard/stats` | Thống kê (users, products, partners, categories, top products, clusters) | ADMIN |
 | GET | `/dashboard/sales-chart` | Biểu đồ doanh số (mặc định 30 ngày) | ADMIN |
 
 ### Clusters
@@ -647,10 +666,11 @@ Recommendation → User?, Cluster?, Product (score, reason)
 - **Premium components:**
   - Stats cards gradient (admin dashboard)
   - Notification dropdown (poll 30s từ backend)
-  - Sidebar collapsible (admin)
+  - Sidebar collapsible (admin — không có Đơn hàng)
   - Staggered list animations (home page)
-  - Product card premium với hover effects
+  - Product card premium với hover effects + hiển thị tên shop
   - Modal địa chỉ, chat realtime-style
+- **Phân trang:** 10 items/trang trên tất cả danh sách (products, orders, users, coupons...)
 - **Custom Tailwind theme:**
   - `primary`: 50-900 (blue)
   - `surface`: secondary, tertiary
@@ -740,21 +760,24 @@ curl -X POST http://localhost:5000/api/coupons/validate \
 ## ✨ Tính năng nổi bật
 
 1. **3 nhánh người dùng** — Admin, Partner, Customer với quyền riêng biệt
-2. **Phân cụm khách hàng** — K-Means + RFM qua ML Service riêng
-3. **Gợi ý cá nhân hóa** — Dựa trên nhóm khách hàng và lịch sử mua hàng
-4. **Flash Sale** — Sự kiện giảm giá có thời gian, quản lý số lượng
-5. **Mã giảm giá** — PERCENTAGE/FIXED, giới hạn sử dụng, theo người dùng
-6. **Chat realtime** — Giữa khách hàng và shop (poll-based)
-7. **Yêu thích & Follow shop** — Theo dõi sản phẩm và cửa hàng
-8. **Quản lý địa chỉ** — Nhiều địa chỉ giao hàng, mặc định
-9. **Hoàn tiền & Vi phạm** — Quy trình xử lý khiếu nại
-10. **Audit Log** — Ghi lại mọi hành động quan trọng
-11. **Thông báo realtime** — Poll 30s cho admin
-12. **Redis Caching** — Cache sản phẩm, gợi ý, trending
-13. **Rate Limiting** — Giới hạn request, auth
-14. **Mobile App** — React Native + Expo (iOS/Android)
-15. **Responsive Design** — Tương thích mọi thiết bị
-16. **Premium UI** — Geist font, glass effects, animations, skeleton loading
+2. **Partner tự xử lý đơn hàng** — Admin không quản lý đơn hàng, partner tự duyệt & xác nhận
+3. **8+ partner shops** — 7 shop đã duyệt với sản phẩm riêng theo từng danh mục
+4. **Phân cụm khách hàng** — K-Means + RFM qua ML Service riêng
+5. **Gợi ý cá nhân hóa** — Dựa trên nhóm khách hàng và lịch sử mua hàng
+6. **Flash Sale** — Sự kiện giảm giá có thời gian, quản lý số lượng
+7. **Mã giảm giá** — PERCENTAGE/FIXED, giới hạn sử dụng, theo người dùng
+8. **Chat realtime** — Giữa khách hàng và shop (poll-based)
+9. **Yêu thích & Follow shop** — Theo dõi sản phẩm và cửa hàng
+10. **Quản lý địa chỉ** — Nhiều địa chỉ giao hàng, mặc định
+11. **Hoàn tiền & Vi phạm** — Quy trình xử lý khiếu nại
+12. **Audit Log** — Ghi lại mọi hành động quan trọng
+13. **Thông báo realtime** — Poll 30s cho admin
+14. **Redis Caching** — Cache sản phẩm, gợi ý, trending
+15. **Rate Limiting** — Giới hạn request, auth
+16. **Mobile App** — React Native + Expo (iOS/Android)
+17. **Responsive Design** — Tương thích mọi thiết bị
+18. **Premium UI** — Geist font, glass effects, animations, skeleton loading
+19. **Phân trang đồng bộ** — 10 items/trang trên tất cả danh sách
 
 ---
 
