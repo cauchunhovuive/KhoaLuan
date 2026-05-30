@@ -23,11 +23,23 @@ const protect = asyncHandler(async (req, res, next) => {
     const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      select: { id: true, email: true, name: true, role: true, avatar: true },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        avatar: true,
+        isApproved: true,
+        isActive: true,
+      },
     });
 
     if (!user) {
       return next(new AppError('Người dùng không tồn tại', 401));
+    }
+
+    if (!user.isActive) {
+      return next(new AppError('Tài khoản đã bị vô hiệu hóa', 401));
     }
 
     req.user = user;

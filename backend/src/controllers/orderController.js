@@ -133,16 +133,24 @@ const getOrder = asyncHandler(async (req, res) => {
   const order = await prisma.order.findUnique({
     where: { id },
     include: {
+      user: { select: { id: true, name: true, phone: true, address: true } },
       orderItems: {
         include: {
-          product: { select: { id: true, name: true, images: true, price: true, slug: true } },
+          product: { select: { id: true, name: true, images: true, price: true, slug: true, partnerId: true } },
         },
       },
     },
   });
 
   if (!order) throw new AppError('Đơn hàng không tồn tại', 404);
-  if (order.userId !== req.user.id && req.user.role !== 'ADMIN') {
+
+  // Cho phép: chủ đơn hàng, admin, hoặc partner có sản phẩm trong đơn
+  const isOwner = order.userId === req.user.id;
+  const isAdmin = req.user.role === 'ADMIN';
+  const isPartnerWithProducts = req.user.role === 'PARTNER' &&
+    order.orderItems.some((item) => item.product.partnerId === req.user.id);
+
+  if (!isOwner && !isAdmin && !isPartnerWithProducts) {
     throw new AppError('Bạn không có quyền xem đơn hàng này', 403);
   }
 
@@ -167,11 +175,30 @@ const cancelOrder = asyncHandler(async (req, res) => {
   res.json({ success: true, data: updated });
 });
 
-// @desc    Update order status (Admin)
+// @desc    Update order status (Admin/Partner)
 // @route   PUT /api/orders/:id/status
 const updateOrderStatus = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
+
+  const existing = await prisma.order.findUnique({
+    where: { id },
+    include: { orderItems: { include: { product: { select: { partnerId: true } } } } },
+  });
+
+  if (!existing) throw new AppError('Đơn hàng không tồn tại', 404);
+
+  // Partner chỉ có thể cập nhật đơn hàng có chứa sản phẩm của họ
+  if (req.user.role === 'PARTNER') {
+    const hasMyProduct = existing.orderItems.some((item) => item.product.partnerId === req.user.id);
+    if (!hasMyProduct) {
+      throw new AppError('Đơn hàng không chứa sản phẩm của bạn', 403);
+    }
+    const partnerAllowed = ['CONFIRMED', 'SHIPPING', 'DELIVERED'];
+    if (!partnerAllowed.includes(status)) {
+      throw new AppError('Bạn không thể chuyển đơn hàng sang trạng thái này', 400);
+    }
+  }
 
   const order = await prisma.order.update({
     where: { id },
@@ -179,7 +206,7 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
     include: { orderItems: true },
   });
 
-  // Mark notification as read when admin updates order status (from PENDING)
+  // Mark notification as read
   if (status !== 'PENDING') {
     await prisma.notification.updateMany({
       where: { referenceId: id, type: 'ORDER', isRead: false },

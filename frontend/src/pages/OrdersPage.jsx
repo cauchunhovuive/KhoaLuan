@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FiPackage, FiChevronRight } from 'react-icons/fi';
+import { FiPackage, FiChevronRight, FiShoppingBag } from 'react-icons/fi';
 import api from '../services/api';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
 const STATUS_MAP = {
-  PENDING: { label: 'Chờ xác nhận', color: 'bg-yellow-100 text-yellow-800' },
-  CONFIRMED: { label: 'Đã xác nhận', color: 'bg-blue-100 text-blue-800' },
-  SHIPPING: { label: 'Đang giao', color: 'bg-purple-100 text-purple-800' },
-  DELIVERED: { label: 'Đã giao', color: 'bg-green-100 text-green-800' },
-  CANCELLED: { label: 'Đã hủy', color: 'bg-red-100 text-red-800' },
+  PENDING: { label: 'Chờ xác nhận', color: 'bg-amber-50 text-amber-700 border-amber-200' },
+  CONFIRMED: { label: 'Đã xác nhận', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  SHIPPING: { label: 'Đang giao', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+  DELIVERED: { label: 'Đã giao', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  CANCELLED: { label: 'Đã hủy', color: 'bg-red-50 text-red-700 border-red-200' },
 };
 
 const OrdersPage = () => {
@@ -28,15 +28,17 @@ const OrdersPage = () => {
   if (loading) return <LoadingSpinner />;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Đơn hàng của tôi</h1>
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
+      <h1 className="text-2xl font-bold text-ink mb-6">Đơn hàng của tôi</h1>
 
       {/* Filter tabs */}
-      <div className="flex space-x-2 mb-6 overflow-x-auto">
+      <div className="flex items-center space-x-2 mb-6 overflow-x-auto pb-1">
         {['', 'PENDING', 'CONFIRMED', 'SHIPPING', 'DELIVERED', 'CANCELLED'].map((status) => (
           <button key={status} onClick={() => setFilter(status)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-              filter === status ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+              filter === status 
+                ? 'bg-primary-600 text-white shadow-premium-sm' 
+                : 'bg-surface-secondary text-ink-secondary hover:bg-surface-tertiary'
             }`}>
             {STATUS_MAP[status]?.label || 'Tất cả'}
           </button>
@@ -44,37 +46,45 @@ const OrdersPage = () => {
       </div>
 
       {orders.length === 0 ? (
-        <div className="text-center py-16">
+        <div className="flex flex-col items-center justify-center py-20 text-center">
           <FiPackage className="text-6xl text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500">Chưa có đơn hàng nào</p>
-          <Link to="/products" className="btn-primary mt-4 inline-block">Mua sắm ngay</Link>
+          <p className="text-ink-secondary font-medium mb-2">Chưa có đơn hàng nào</p>
+          <p className="text-ink-tertiary text-sm mb-6">Bắt đầu mua sắm để có đơn hàng đầu tiên</p>
+          <Link to="/products" className="btn-primary inline-flex items-center space-x-2">
+            <FiShoppingBag /><span>Mua sắm ngay</span>
+          </Link>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-4 stagger-fade">
           {orders.map((order) => (
-            <Link key={order.id} to={`/orders/${order.id}`} className="card p-4 block hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <span className="text-sm text-gray-500">Đơn hàng #{order.id.slice(0, 8)}</span>
-                  <span className={`ml-3 badge ${STATUS_MAP[order.status]?.color}`}>
+            <Link key={order.id} to={`/orders/${order.id}`} className="card p-5 block hover:shadow-premium-md hover:-translate-y-0.5 transition-all duration-200">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <span className="text-sm text-ink-tertiary font-mono">#{order.id.slice(0, 8)}</span>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-medium border ${STATUS_MAP[order.status]?.color}`}>
                     {STATUS_MAP[order.status]?.label}
                   </span>
                 </div>
                 <FiChevronRight className="text-gray-400" />
               </div>
-              <div className="flex items-center space-x-4">
-                {order.orderItems?.slice(0, 3).map((item) => (
-                  <div key={item.id} className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+              <div className="flex items-center space-x-3">
+                {order.orderItems?.slice(0, 4).map((item) => (
+                  <div key={item.id} className="w-12 h-12 bg-surface-secondary rounded-xl overflow-hidden flex-shrink-0 ring-1 ring-gray-100">
                     {item.product?.images?.[0] ? (
                       <img src={item.product.images[0]} alt="" className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400"><FiPackage /></div>
+                      <div className="w-full h-full flex items-center justify-center text-gray-300"><FiPackage size={16} /></div>
                     )}
                   </div>
                 ))}
+                {order.orderItems?.length > 4 && (
+                  <div className="w-12 h-12 bg-surface-tertiary rounded-xl flex items-center justify-center text-sm font-medium text-ink-secondary">
+                    +{order.orderItems.length - 4}
+                  </div>
+                )}
               </div>
-              <div className="flex items-center justify-between mt-3 pt-3 border-t">
-                <span className="text-sm text-gray-500">{new Date(order.createdAt).toLocaleDateString('vi-VN')}</span>
+              <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
+                <span className="text-sm text-ink-tertiary">{new Date(order.createdAt).toLocaleDateString('vi-VN')}</span>
                 <span className="font-bold text-primary-600">{order.finalAmount.toLocaleString('vi-VN')}₫</span>
               </div>
             </Link>

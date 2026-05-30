@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { FiUser, FiMail, FiPhone, FiMapPin, FiSave, FiCamera } from 'react-icons/fi';
+import { FiUser, FiMail, FiPhone, FiMapPin, FiSave, FiCamera, FiArrowRight } from 'react-icons/fi';
 import { updateProfile } from '../store/authSlice';
 import toast from 'react-hot-toast';
 
@@ -34,69 +34,78 @@ const ProfilePage = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-8">Thông tin cá nhân</h1>
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
+      <h1 className="text-2xl font-bold text-ink mb-8">Thông tin cá nhân</h1>
 
-      <div className="card p-8">
-        {/* Avatar */}
-        <div className="flex items-center space-x-4 mb-8">
-          <div className="relative">
-            <div className="w-20 h-20 bg-primary-100 rounded-full flex items-center justify-center">
-              <span className="text-2xl font-bold text-primary-600">{user?.name?.[0] || 'U'}</span>
+      <div className="p-1.5 bg-primary-50/50 rounded-[2rem] ring-1 ring-primary-100/50">
+        <div className="bg-white rounded-[calc(2rem-0.375rem)] shadow-premium-lg p-8">
+          {/* Avatar */}
+          <div className="flex items-center space-x-5 mb-8 pb-6 border-b border-gray-100">
+            <div className="relative">
+              <div className="w-20 h-20 bg-primary-50 rounded-2xl flex items-center justify-center ring-2 ring-primary-100">
+                <span className="text-3xl font-bold text-primary-600">{user?.name?.[0] || 'U'}</span>
+              </div>
+              <button className="absolute bottom-0 -right-1 bg-primary-600 text-white p-2 rounded-xl hover:bg-primary-700 transition-colors shadow-premium-md">
+                <FiCamera size={14} />
+              </button>
             </div>
-            <button className="absolute bottom-0 right-0 bg-primary-600 text-white p-1.5 rounded-full hover:bg-primary-700">
-              <FiCamera size={14} />
-            </button>
+            <div>
+              <h2 className="text-lg font-semibold text-ink">{user?.name}</h2>
+              <p className="text-sm text-ink-secondary">{user?.email}</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">{user?.name}</h2>
-            <p className="text-sm text-gray-500">{user?.email}</p>
-          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="block text-sm font-medium text-ink-secondary mb-1.5">Họ tên</label>
+              <div className="relative group">
+                <FiUser className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-500 transition-colors" />
+                <input type="text" name="name" value={formData.name} onChange={handleChange}
+                  className="input-field pl-10" required />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-ink-secondary mb-1.5">Email</label>
+              <div className="relative">
+                <FiMail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input type="email" value={user?.email || ''} className="input-field pl-10 bg-surface-secondary text-ink-tertiary" disabled />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-ink-secondary mb-1.5">Số điện thoại</label>
+              <div className="relative group">
+                <FiPhone className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-500 transition-colors" />
+                <input type="tel" name="phone" value={formData.phone} onChange={handleChange}
+                  className="input-field pl-10" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-ink-secondary mb-1.5">Địa chỉ</label>
+              <div className="relative group">
+                <FiMapPin className="absolute left-3.5 top-3 text-gray-400 group-focus-within:text-primary-500 transition-colors" />
+                <textarea name="address" value={formData.address} onChange={handleChange}
+                  className="input-field pl-10" rows={2} />
+              </div>
+            </div>
+
+            <div className="pt-4">
+              <button type="submit" disabled={saving} className="btn-primary inline-flex items-center space-x-2 group">
+                {saving ? (
+                  'Đang lưu...'
+                ) : (
+                  <>
+                    <FiSave />
+                    <span>Lưu thay đổi</span>
+                    <FiArrowRight className="group-hover:translate-x-0.5 transition-transform" />
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Họ tên</label>
-            <div className="relative">
-              <FiUser className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input type="text" name="name" value={formData.name} onChange={handleChange}
-                className="input-field pl-10" required />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <div className="relative">
-              <FiMail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input type="email" value={user?.email || ''} className="input-field pl-10 bg-gray-50" disabled />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Số điện thoại</label>
-            <div className="relative">
-              <FiPhone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input type="tel" name="phone" value={formData.phone} onChange={handleChange}
-                className="input-field pl-10" />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Địa chỉ</label>
-            <div className="relative">
-              <FiMapPin className="absolute left-3 top-3 text-gray-400" />
-              <textarea name="address" value={formData.address} onChange={handleChange}
-                className="input-field pl-10" rows={2} />
-            </div>
-          </div>
-
-          <div className="pt-4">
-            <button type="submit" disabled={saving} className="btn-primary flex items-center space-x-2">
-              <FiSave />
-              <span>{saving ? 'Đang lưu...' : 'Lưu thay đổi'}</span>
-            </button>
-          </div>
-        </form>
       </div>
     </div>
   );

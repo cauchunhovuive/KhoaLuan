@@ -58,49 +58,59 @@ const CategoriesManagePage = () => {
   };
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">Quản lý danh mục</h2>
+    <div className="animate-fade-in space-y-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-ink">Quản lý danh mục</h2>
+          <p className="text-ink-tertiary text-sm mt-1">Quản lý danh mục sản phẩm</p>
+        </div>
         <button onClick={() => { setShowForm(true); setEditingId(null); setFormData({ name: '', description: '' }); }}
-          className="btn-primary flex items-center space-x-2">
-          <FiPlus /><span>Thêm danh mục</span>
+          className="btn-primary inline-flex items-center space-x-2">
+          <FiPlus className="text-sm" />
+          <span>Thêm danh mục</span>
         </button>
       </div>
 
       {showForm && (
-        <div className="card p-6 mb-6">
-          <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tên danh mục</label>
-              <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="input-field" required />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả</label>
-              <textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="input-field" rows={2} />
-            </div>
-            <div className="flex space-x-3">
-              <button type="submit" className="btn-primary">{editingId ? 'Cập nhật' : 'Thêm mới'}</button>
-              <button type="button" onClick={() => setShowForm(false)} className="btn-secondary">Hủy</button>
-            </div>
-          </form>
+        <div className="p-1.5 bg-primary-50/50 rounded-[1.5rem] ring-1 ring-primary-100/50 animate-slide-up">
+          <div className="bg-white rounded-[calc(1.5rem-0.375rem)] p-6">
+            <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
+              <div>
+                <label className="block text-sm font-medium text-ink-secondary mb-1.5">Tên danh mục</label>
+                <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="input-field" required />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-ink-secondary mb-1.5">Mô tả</label>
+                <textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="input-field" rows={2} />
+              </div>
+              <div className="flex space-x-3 pt-2">
+                <button type="submit" className="btn-primary">{editingId ? 'Cập nhật' : 'Thêm mới'}</button>
+                <button type="button" onClick={() => setShowForm(false)} className="btn-secondary">Hủy</button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
       {loading ? <LoadingSpinner /> : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 stagger-fade">
           {categories.map((cat) => (
-            <div key={cat.id} className="card p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold text-gray-900">{cat.name}</h3>
-                <div className="flex items-center space-x-1">
-                  <button onClick={() => handleEdit(cat)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg"><FiEdit2 size={14} /></button>
-                  <button onClick={() => handleDelete(cat.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg"><FiTrash2 size={14} /></button>
+            <div key={cat.id} className="card p-5 hover:border-gray-200 transition-all duration-200">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="font-semibold text-ink">{cat.name}</h3>
+                  {cat.description && <p className="text-sm text-ink-secondary mt-0.5 line-clamp-2">{cat.description}</p>}
+                </div>
+                <div className="flex items-center space-x-1 flex-shrink-0">
+                  <button onClick={() => handleEdit(cat)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"><FiEdit2 size={14} /></button>
+                  <button onClick={() => handleDelete(cat.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-xl transition-colors"><FiTrash2 size={14} /></button>
                 </div>
               </div>
-              {cat.description && <p className="text-sm text-gray-500">{cat.description}</p>}
-              <p className="text-xs text-gray-400 mt-2">{cat._count?.products || 0} sản phẩm</p>
+              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                <span className="text-xs text-ink-tertiary">{cat._count?.products || 0} sản phẩm</span>
+              </div>
             </div>
           ))}
         </div>

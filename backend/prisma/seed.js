@@ -8,18 +8,15 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Bắt đầu seed dữ liệu...\n');
 
-  // ─── Xoá dữ liệu cũ ───
-  await prisma.recommendation.deleteMany();
-  await prisma.clusterRule.deleteMany();
-  await prisma.cluster.deleteMany();
-  await prisma.review.deleteMany();
-  await prisma.cartItem.deleteMany();
-  await prisma.orderItem.deleteMany();
-  await prisma.order.deleteMany();
-  await prisma.product.deleteMany();
-  await prisma.category.deleteMany();
-  await prisma.user.deleteMany();
-  console.log('  ✔ Đã xoá dữ liệu cũ');
+  // ─── Kiểm tra nếu đã có dữ liệu thì bỏ qua ───
+  const existingAdmin = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
+  const existingCategories = await prisma.category.count();
+
+  if (existingAdmin || existingCategories > 0) {
+    console.log('  ℹ Dữ liệu đã tồn tại, bỏ qua seed.');
+    console.log('  Nếu muốn seed lại, chạy: docker exec khoaluan-backend sh -c "node prisma/seed.js --force"');
+    return;
+  }
 
   // ─── Tài khoản Admin ───
   const adminPassword = await bcrypt.hash('admin123', 12);
@@ -35,6 +32,59 @@ async function main() {
     },
   });
   console.log(`  ✔ Tạo admin: ${admin.email}`);
+
+  // ─── Tài khoản Partner mẫu ───
+  const partnerPassword = await bcrypt.hash('partner123', 12);
+  const partners = await Promise.all([
+    prisma.user.create({
+      data: {
+        email: 'partner1@shop.com',
+        password: partnerPassword,
+        name: 'Nguyễn Văn Kinh Doanh',
+        phone: '0945678901',
+        role: 'PARTNER',
+        isActive: true,
+        isApproved: true,
+        approvedAt: new Date(),
+        storeName: 'Shop Điện Tử ABC',
+        storeDescription: 'Chuyên điện thoại, laptop chính hãng giá tốt',
+        taxCode: '1234567890',
+        businessAddress: '123 Nguyễn Huệ, Q.1, TP.HCM',
+      },
+    }),
+    prisma.user.create({
+      data: {
+        email: 'partner2@fashion.com',
+        password: partnerPassword,
+        name: 'Trần Thị Thời Trang',
+        phone: '0956789012',
+        role: 'PARTNER',
+        isActive: true,
+        isApproved: true,
+        approvedAt: new Date(),
+        storeName: 'Fashion House XYZ',
+        storeDescription: 'Thời trang cao cấp cho nam và nữ',
+        taxCode: '0987654321',
+        businessAddress: '456 Trần Hưng Đạo, Q.Hoàn Kiếm, Hà Nội',
+      },
+    }),
+    prisma.user.create({
+      data: {
+        email: 'partner3@new.com',
+        password: partnerPassword,
+        name: 'Lê Thị Mới',
+        phone: '0967890123',
+        role: 'PARTNER',
+        isActive: true,
+        isApproved: false,
+        storeName: 'Cửa hàng mới',
+        storeDescription: 'Đang chờ phê duyệt',
+        taxCode: '1122334455',
+        businessAddress: '789 Bạch Đằng, Đà Nẵng',
+      },
+    }),
+  ]);
+  console.log(`  ✔ Tạo ${partners.length} đối tác mẫu`);
 
   // ─── Tài khoản Customer mẫu ───
   const customerPassword = await bcrypt.hash('customer123', 12);
@@ -122,35 +172,26 @@ async function main() {
 
   // ─── Sản phẩm mẫu ───
   const productsData = [
-    // Điện thoại (category 0)
-    { name: 'iPhone 15 Pro Max 256GB', slug: 'iphone-15-pro-max-256gb', price: 34990000, discountPrice: 32990000, stock: 50, soldCount: 128, rating: 4.8, reviewCount: 256, categoryIdx: 0 },
-    { name: 'Samsung Galaxy S24 Ultra', slug: 'samsung-galaxy-s24-ultra', price: 32990000, discountPrice: 30990000, stock: 35, soldCount: 95, rating: 4.7, reviewCount: 182, categoryIdx: 0 },
-    { name: 'Xiaomi 14 Pro', slug: 'xiaomi-14-pro', price: 18990000, discountPrice: null, stock: 60, soldCount: 74, rating: 4.6, reviewCount: 143, categoryIdx: 0 },
-    { name: 'Ốp lưng silicon iPhone 15', slug: 'op-lung-silicon-iphone-15', price: 199000, discountPrice: 149000, stock: 200, soldCount: 512, rating: 4.5, reviewCount: 89, categoryIdx: 0 },
-    { name: 'Cáp sạc Type-C 2m', slug: 'cap-sac-type-c-2m', price: 99000, discountPrice: null, stock: 500, soldCount: 1024, rating: 4.4, reviewCount: 67, categoryIdx: 0 },
-
-    // Laptop (category 1)
-    { name: 'MacBook Pro M3 Pro 14"', slug: 'macbook-pro-m3-pro-14', price: 45990000, discountPrice: 43990000, stock: 20, soldCount: 56, rating: 4.9, reviewCount: 112, categoryIdx: 1 },
-    { name: 'Dell XPS 15', slug: 'dell-xps-15', price: 35990000, discountPrice: 33990000, stock: 15, soldCount: 38, rating: 4.7, reviewCount: 76, categoryIdx: 1 },
-    { name: 'iPad Air M2 11"', slug: 'ipad-air-m2-11', price: 18990000, discountPrice: null, stock: 40, soldCount: 89, rating: 4.8, reviewCount: 134, categoryIdx: 1 },
-    { name: 'Lenovo ThinkPad X1 Carbon', slug: 'lenovo-thinkpad-x1-carbon', price: 39990000, discountPrice: 37990000, stock: 10, soldCount: 25, rating: 4.6, reviewCount: 48, categoryIdx: 1 },
-
-    // Thời trang (category 2)
-    { name: 'Áo sơ mi nam công sở', slug: 'ao-so-mi-nam-cong-so', price: 399000, discountPrice: 299000, stock: 150, soldCount: 345, rating: 4.5, reviewCount: 78, categoryIdx: 2 },
-    { name: 'Đầm dự tiệc nữ cao cấp', slug: 'dam-du-tiec-nu-cao-cap', price: 899000, discountPrice: 749000, stock: 80, soldCount: 167, rating: 4.6, reviewCount: 92, categoryIdx: 2 },
-    { name: 'Giày thể thao nam', slug: 'giay-the-thao-nam', price: 1599000, discountPrice: 1299000, stock: 100, soldCount: 289, rating: 4.7, reviewCount: 156, categoryIdx: 2 },
-    { name: 'Túi xách nữ thời trang', slug: 'tui-xach-nu-thoi-trang', price: 699000, discountPrice: null, stock: 60, soldCount: 134, rating: 4.4, reviewCount: 45, categoryIdx: 2 },
-
-    // Đồ gia dụng (category 3)
-    { name: 'Máy hút bụi thông minh', slug: 'may-hut-bui-thong-minh', price: 5999000, discountPrice: 5499000, stock: 25, soldCount: 67, rating: 4.6, reviewCount: 89, categoryIdx: 3 },
-    { name: 'Nồi chiên không dầu 5.5L', slug: 'noi-chien-khong-dau-55l', price: 1599000, discountPrice: 1399000, stock: 45, soldCount: 234, rating: 4.8, reviewCount: 178, categoryIdx: 3 },
-    { name: 'Máy pha cà phê tự động', slug: 'may-pha-ca-phe-tu-dong', price: 8999000, discountPrice: null, stock: 12, soldCount: 34, rating: 4.5, reviewCount: 56, categoryIdx: 3 },
-    { name: 'Bộ dao nhà bếp 5 món', slug: 'bo-dao-nha-bep-5-mon', price: 499000, discountPrice: 399000, stock: 80, soldCount: 189, rating: 4.3, reviewCount: 67, categoryIdx: 3 },
-
-    // Sách (category 4)
-    { name: 'Sách "Nhà giả kim" - Paulo Coelho', slug: 'sach-nha-gia-kim', price: 89000, discountPrice: 69000, stock: 300, soldCount: 1567, rating: 4.9, reviewCount: 892, categoryIdx: 4 },
-    { name: 'Sách "Atomic Habits" - James Clear', slug: 'sach-atomic-habits', price: 149000, discountPrice: 119000, stock: 250, soldCount: 1234, rating: 4.8, reviewCount: 745, categoryIdx: 4 },
-    { name: 'Sổ tay bìa da A5', slug: 'so-tay-bia-da-a5', price: 149000, discountPrice: null, stock: 400, soldCount: 678, rating: 4.5, reviewCount: 123, categoryIdx: 4 },
+    { name: 'iPhone 15 Pro Max 256GB', slug: 'iphone-15-pro-max-256gb', price: 34990000, discountPrice: 32990000, stock: 50, soldCount: 128, rating: 4.8, reviewCount: 256, categoryIdx: 0, partnerIdx: 0 },
+    { name: 'Samsung Galaxy S24 Ultra', slug: 'samsung-galaxy-s24-ultra', price: 32990000, discountPrice: 30990000, stock: 35, soldCount: 95, rating: 4.7, reviewCount: 182, categoryIdx: 0, partnerIdx: 0 },
+    { name: 'Xiaomi 14 Pro', slug: 'xiaomi-14-pro', price: 18990000, discountPrice: null, stock: 60, soldCount: 74, rating: 4.6, reviewCount: 143, categoryIdx: 0, partnerIdx: null },
+    { name: 'Ốp lưng silicon iPhone 15', slug: 'op-lung-silicon-iphone-15', price: 199000, discountPrice: 149000, stock: 200, soldCount: 512, rating: 4.5, reviewCount: 89, categoryIdx: 0, partnerIdx: null },
+    { name: 'Cáp sạc Type-C 2m', slug: 'cap-sac-type-c-2m', price: 99000, discountPrice: null, stock: 500, soldCount: 1024, rating: 4.4, reviewCount: 67, categoryIdx: 0, partnerIdx: 0 },
+    { name: 'MacBook Pro M3 Pro 14"', slug: 'macbook-pro-m3-pro-14', price: 45990000, discountPrice: 43990000, stock: 20, soldCount: 56, rating: 4.9, reviewCount: 112, categoryIdx: 1, partnerIdx: 0 },
+    { name: 'Dell XPS 15', slug: 'dell-xps-15', price: 35990000, discountPrice: 33990000, stock: 15, soldCount: 38, rating: 4.7, reviewCount: 76, categoryIdx: 1, partnerIdx: 0 },
+    { name: 'iPad Air M2 11"', slug: 'ipad-air-m2-11', price: 18990000, discountPrice: null, stock: 40, soldCount: 89, rating: 4.8, reviewCount: 134, categoryIdx: 1, partnerIdx: null },
+    { name: 'Lenovo ThinkPad X1 Carbon', slug: 'lenovo-thinkpad-x1-carbon', price: 39990000, discountPrice: 37990000, stock: 10, soldCount: 25, rating: 4.6, reviewCount: 48, categoryIdx: 1, partnerIdx: 0 },
+    { name: 'Áo sơ mi nam công sở', slug: 'ao-so-mi-nam-cong-so', price: 399000, discountPrice: 299000, stock: 150, soldCount: 345, rating: 4.5, reviewCount: 78, categoryIdx: 2, partnerIdx: 1 },
+    { name: 'Đầm dự tiệc nữ cao cấp', slug: 'dam-du-tiec-nu-cao-cap', price: 899000, discountPrice: 749000, stock: 80, soldCount: 167, rating: 4.6, reviewCount: 92, categoryIdx: 2, partnerIdx: 1 },
+    { name: 'Giày thể thao nam', slug: 'giay-the-thao-nam', price: 1599000, discountPrice: 1299000, stock: 100, soldCount: 289, rating: 4.7, reviewCount: 156, categoryIdx: 2, partnerIdx: 1 },
+    { name: 'Túi xách nữ thời trang', slug: 'tui-xach-nu-thoi-trang', price: 699000, discountPrice: null, stock: 60, soldCount: 134, rating: 4.4, reviewCount: 45, categoryIdx: 2, partnerIdx: 1 },
+    { name: 'Máy hút bụi thông minh', slug: 'may-hut-bui-thong-minh', price: 5999000, discountPrice: 5499000, stock: 25, soldCount: 67, rating: 4.6, reviewCount: 89, categoryIdx: 3, partnerIdx: null },
+    { name: 'Nồi chiên không dầu 5.5L', slug: 'noi-chien-khong-dau-55l', price: 1599000, discountPrice: 1399000, stock: 45, soldCount: 234, rating: 4.8, reviewCount: 178, categoryIdx: 3, partnerIdx: null },
+    { name: 'Máy pha cà phê tự động', slug: 'may-pha-ca-phe-tu-dong', price: 8999000, discountPrice: null, stock: 12, soldCount: 34, rating: 4.5, reviewCount: 56, categoryIdx: 3, partnerIdx: null },
+    { name: 'Bộ dao nhà bếp 5 món', slug: 'bo-dao-nha-bep-5-mon', price: 499000, discountPrice: 399000, stock: 80, soldCount: 189, rating: 4.3, reviewCount: 67, categoryIdx: 3, partnerIdx: null },
+    { name: 'Sách "Nhà giả kim" - Paulo Coelho', slug: 'sach-nha-gia-kim', price: 89000, discountPrice: 69000, stock: 300, soldCount: 1567, rating: 4.9, reviewCount: 892, categoryIdx: 4, partnerIdx: null },
+    { name: 'Sách "Atomic Habits" - James Clear', slug: 'sach-atomic-habits', price: 149000, discountPrice: 119000, stock: 250, soldCount: 1234, rating: 4.8, reviewCount: 745, categoryIdx: 4, partnerIdx: null },
+    { name: 'Sổ tay bìa da A5', slug: 'so-tay-bia-da-a5', price: 149000, discountPrice: null, stock: 400, soldCount: 678, rating: 4.5, reviewCount: 123, categoryIdx: 4, partnerIdx: null },
   ];
 
   const products = await Promise.all(
@@ -168,6 +209,7 @@ async function main() {
           rating: p.rating,
           reviewCount: p.reviewCount,
           categoryId: categories[p.categoryIdx].id,
+          partnerId: p.partnerIdx !== null ? partners[p.partnerIdx].id : null,
         },
       })
     )
@@ -281,14 +323,17 @@ async function main() {
   console.log('✅ Seed hoàn tất!');
   console.log('───────────────────────────────────────');
   console.log('\n📋 Tài khoản mẫu:');
-  console.log('   ┌──────────────────────┬──────────────┬──────────────┐');
-  console.log('   │ Email                │ Mật khẩu     │ Vai trò      │');
-  console.log('   ├──────────────────────┼──────────────┼──────────────┤');
-  console.log('   │ admin@khoaluan.com   │ admin123     │ ADMIN        │');
-  console.log('   │ customer1@test.com   │ customer123  │ CUSTOMER     │');
-  console.log('   │ customer2@test.com   │ customer123  │ CUSTOMER     │');
-  console.log('   │ customer3@test.com   │ customer123  │ CUSTOMER     │');
-  console.log('   └──────────────────────┴──────────────┴──────────────┘');
+  console.log('   ┌──────────────────────────┬────────────────┬──────────────┐');
+  console.log('   │ Email                    │ Mật khẩu       │ Vai trò      │');
+  console.log('   ├──────────────────────────┼────────────────┼──────────────┤');
+  console.log('   │ admin@khoaluan.com       │ admin123       │ ADMIN        │');
+  console.log('   │ partner1@shop.com        │ partner123     │ PARTNER ✓    │');
+  console.log('   │ partner2@fashion.com     │ partner123     │ PARTNER ✓    │');
+  console.log('   │ partner3@new.com         │ partner123     │ PARTNER ✗    │');
+  console.log('   │ customer1@test.com       │ customer123    │ CUSTOMER     │');
+  console.log('   │ customer2@test.com       │ customer123    │ CUSTOMER     │');
+  console.log('   │ customer3@test.com       │ customer123    │ CUSTOMER     │');
+  console.log('   └──────────────────────────┴────────────────┴──────────────┘');
   console.log('\n📦 Dữ liệu: 5 danh mục, 20 sản phẩm, 4 đơn hàng, 6 đánh giá');
   console.log('───────────────────────────────────────\n');
 }

@@ -29,11 +29,30 @@ import ClustersPage from './pages/admin/ClustersPage';
 import RecommendationsPage from './pages/admin/RecommendationsPage';
 import SettingsPage from './pages/admin/SettingsPage';
 
+// Partner pages
+import PartnerLayout from './components/Layout/PartnerLayout';
+import PartnerDashboardPage from './pages/partner/PartnerDashboardPage';
+import PartnerProductsPage from './pages/partner/PartnerProductsPage';
+import PartnerOrdersPage from './pages/partner/PartnerOrdersPage';
+import PartnerProfilePage from './pages/partner/PartnerProfilePage';
+
+// Admin partner pages
+import PartnersManagePage from './pages/admin/PartnersManagePage';
+
 const ProtectedRoute = ({ children, adminOnly = false }) => {
   const { isAuthenticated, user } = useSelector((state) => state.auth);
 
   if (!isAuthenticated) return <Navigate to="/login" />;
   if (adminOnly && user?.role !== 'ADMIN') return <Navigate to="/" />;
+
+  return children;
+};
+
+const PartnerRoute = ({ children }) => {
+  const { isAuthenticated, user } = useSelector((state) => state.auth);
+
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (user?.role !== 'PARTNER' && user?.role !== 'ADMIN') return <Navigate to="/" />;
 
   return children;
 };
@@ -74,9 +93,18 @@ function App() {
         } />
       </Route>
 
-      {/* Auth routes */}
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
+      {/* Auth routes */}        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+
+        {/* Partner routes */}
+        <Route path="/partner" element={
+          <PartnerRoute><PartnerLayout /></PartnerRoute>
+        }>
+          <Route index element={<PartnerDashboardPage />} />
+          <Route path="products" element={<PartnerProductsPage />} />
+          <Route path="orders" element={<PartnerOrdersPage />} />
+          <Route path="profile" element={<PartnerProfilePage />} />
+        </Route>
 
       {/* Admin routes */}
       <Route path="/admin" element={
@@ -87,6 +115,7 @@ function App() {
         <Route path="categories" element={<CategoriesManagePage />} />
         <Route path="orders" element={<OrdersManagePage />} />
         <Route path="users" element={<UsersManagePage />} />
+        <Route path="partners" element={<PartnersManagePage />} />
         <Route path="clusters" element={<ClustersPage />} />
         <Route path="recommendations" element={<RecommendationsPage />} />
         <Route path="settings" element={<SettingsPage />} />

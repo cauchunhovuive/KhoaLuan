@@ -13,5 +13,6 @@ router.use('/dashboard', require('./dashboard'));
 router.use('/reviews', require('./reviews'));
 router.use('/settings', require('./settings'));
 router.use('/notifications', require('./notifications'));
+router.use('/partner', require('./partner'));
 
 module.exports = router;

@@ -9,8 +9,8 @@ router.get('/featured', getFeaturedProducts);
 router.get('/slug/:slug', getProductBySlug);
 router.get('/', getProducts);
 router.get('/:id', getProduct);
-router.post('/', protect, restrictTo('ADMIN'), createProduct);
-router.put('/:id', protect, restrictTo('ADMIN'), updateProduct);
-router.delete('/:id', protect, restrictTo('ADMIN'), deleteProduct);
+router.post('/', protect, restrictTo('ADMIN', 'PARTNER'), createProduct);
+router.put('/:id', protect, restrictTo('ADMIN', 'PARTNER'), updateProduct);
+router.delete('/:id', protect, restrictTo('ADMIN', 'PARTNER'), deleteProduct);
 
 module.exports = router;

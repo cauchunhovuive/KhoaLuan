@@ -1,0 +1,30 @@
+name: design-taste-frontend
+description: Anti-slop frontend skill for landing pages, portfolios, and redesigns. The agent reads the brief, infers the right design direction, and ships interfaces that do not look templated.
+
+# Design Taste Frontend Skill
+
+## Overview
+A specialized frontend design skill that prevents generic AI-looking interfaces by enforcing design principles, typography discipline, color calibration, and layout diversification. Works for landing pages, portfolios, and redesigns.
+
+## Key Features
+- **Brief Inference Engine**: Automatically reads design brief signals (page kind, vibe words, audience, brand assets)
+- **Three Design Dials**: DESIGN_VARIANCE (1-10), MOTION_INTENSITY (1-10), VISUAL_DENSITY (1-10)
+- **Design System Mapping**: Maps briefs to real design systems (Fluent, Carbon, Material, shadcn/ui, etc.)
+- **Anti-Pattern Enforcement**: Blocks common AI tells (purple gradients, glassmorphism spam, centered hero defaults)
+- **Pre-Flight Check**: 50+ point checklist before shipping any design
+
+## Configuration
+The skill uses three dials that can be overridden conversationally:
+- `DESIGN_VARIANCE: 8` (1=Perfect Symmetry, 10=Artsy Chaos)
+- `MOTION_INTENSITY: 6` (1=Static, 10=Cinematic)
+- `VISUAL_DENSITY: 4` (1=Airy, 10=Packed)
+
+## When to Use
+- Building new landing pages, portfolios, marketing sites
+- Redesigning existing websites (preserve or overhaul modes)
+- Creating premium SaaS, agency, or editorial interfaces
+- Any frontend work where visual quality matters
+
+## Source
+- GitHub: Leonxlnx/taste-skill
+- Path: skills/taste-skill/SKILL.md

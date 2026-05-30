@@ -108,27 +108,43 @@ const getProduct = asyncHandler(async (req, res) => {
   res.json({ success: true, data: product });
 });
 
-// @desc    Create product (Admin)
+// @desc    Create product (Admin/Partner)
 // @route   POST /api/products
 const createProduct = asyncHandler(async (req, res) => {
   const { name, description, price, discountPrice, images, stock, categoryId } = req.body;
 
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
-  const product = await prisma.product.create({
-    data: { name, slug, description, price, discountPrice, images, stock, categoryId },
-  });
+  const data = { name, slug, description, price, discountPrice, images, stock, categoryId };
+
+  // Nếu là partner, gắn partnerId
+  if (req.user.role === 'PARTNER') {
+    if (!req.user.isApproved) {
+      throw new AppError('Tài khoản đối tác chưa được phê duyệt', 403);
+    }
+    data.partnerId = req.user.id;
+  }
+
+  const product = await prisma.product.create({ data });
 
   await cacheDel('products:*');
 
   res.status(201).json({ success: true, data: product });
 });
 
-// @desc    Update product (Admin)
+// @desc    Update product (Admin/Partner)
 // @route   PUT /api/products/:id
 const updateProduct = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { name, description, price, discountPrice, images, stock, categoryId, isActive } = req.body;
+
+  // Kiểm tra quyền sở hữu nếu là partner
+  const existing = await prisma.product.findUnique({ where: { id } });
+  if (!existing) throw new AppError('Sản phẩm không tồn tại', 404);
+
+  if (req.user.role === 'PARTNER' && existing.partnerId !== req.user.id) {
+    throw new AppError('Bạn không có quyền sửa sản phẩm này', 403);
+  }
 
   const data = {};
   if (name) { data.name = name; data.slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''); }
@@ -150,10 +166,18 @@ const updateProduct = asyncHandler(async (req, res) => {
   res.json({ success: true, data: product });
 });
 
-// @desc    Delete product (Admin)
+// @desc    Delete product (Admin/Partner)
 // @route   DELETE /api/products/:id
 const deleteProduct = asyncHandler(async (req, res) => {
   const { id } = req.params;
+
+  const existing = await prisma.product.findUnique({ where: { id } });
+  if (!existing) throw new AppError('Sản phẩm không tồn tại', 404);
+
+  if (req.user.role === 'PARTNER' && existing.partnerId !== req.user.id) {
+    throw new AppError('Bạn không có quyền xoá sản phẩm này', 403);
+  }
+
   await prisma.product.update({
     where: { id },
     data: { isActive: false },

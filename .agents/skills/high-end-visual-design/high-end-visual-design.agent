@@ -1,0 +1,36 @@
+name: high-end-visual-design
+description: Teaches the AI to design like a high-end agency. Defines the exact fonts, spacing, shadows, card structures, and animations that make a website feel expensive. Blocks all the common defaults that make AI designs look cheap or generic.
+
+# High-End Visual Design Skill
+
+## Overview
+A premium UI/UX architecture skill that produces $150k+ agency-level digital experiences. Enforces haptic depth, cinematic spatial rhythm, obsessive micro-interactions, and flawless fluid motion.
+
+## Key Features
+- **Creative Variance Engine**: Combines vibe/texture archetypes with layout archetypes for unique outputs
+- **Double-Bezel Architecture**: Nested enclosures for premium card/container design
+- **Button-in-Button Pattern**: Premium CTA buttons with nested icon wrappers
+- **Fluid Island Nav**: Floating glass pill navigation with staggered mask reveals
+- **Magnetic Button Physics**: Spring-based hover interactions
+- **Scroll Interpolation**: Heavy fade-up entry animations
+
+## Banned Elements (Absolute Zero)
+- Fonts: Inter, Roboto, Arial, Open Sans, Helvetica
+- Icons: Lucide, FontAwesome, Material Icons (standard weights)
+- Generic 1px gray borders and harsh shadows
+- Standard `linear` or `ease-in-out` transitions
+
+## Performance Guardrails
+- GPU-safe animations (transform + opacity only)
+- backdrop-blur on fixed/sticky elements only
+- z-index discipline for systemic layers
+
+## When to Use
+- Premium brand websites and landing pages
+- Agency portfolios and creative showcases
+- High-end consumer products
+- Any project requiring Awwwards-tier quality
+
+## Source
+- GitHub: Leonxlnx/taste-skill
+- Path: skills/soft-skill/SKILL.md

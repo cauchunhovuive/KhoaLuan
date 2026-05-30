@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { FiMapPin, FiPhone, FiFileText, FiCreditCard } from 'react-icons/fi';
+import { FiMapPin, FiPhone, FiFileText, FiCreditCard, FiTruck } from 'react-icons/fi';
 import api from '../services/api';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import toast from 'react-hot-toast';
@@ -49,7 +49,6 @@ const CheckoutPage = () => {
       toast.error('Vui lòng nhập đầy đủ thông tin giao hàng');
       return;
     }
-
     setLoading(true);
     try {
       const { data } = await api.post('/orders', formData);
@@ -66,38 +65,43 @@ const CheckoutPage = () => {
   const finalAmount = total + shippingFee;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-8">Thanh toán</h1>
+    <div className="section-container py-8 animate-fade-in">
+      <h1 className="text-2xl font-bold text-ink mb-8">Thanh toán</h1>
 
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
             {/* Shipping info */}
-            <div className="card p-6">
-              <h3 className="font-semibold text-gray-900 mb-4 flex items-center space-x-2">
-                <FiMapPin className="text-primary-600" />
-                <span>Thông tin giao hàng</span>
-              </h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Địa chỉ *</label>
-                  <textarea name="shippingAddress" value={formData.shippingAddress} onChange={handleChange}
-                    className="input-field" rows={2} placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" required />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Số điện thoại *</label>
-                  <div className="relative">
-                    <FiPhone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input type="tel" name="phone" value={formData.phone} onChange={handleChange}
-                      className="input-field pl-10" placeholder="0123 456 789" required />
+            <div className="p-1.5 bg-primary-50/50 rounded-[1.5rem] ring-1 ring-primary-100/50">
+              <div className="bg-white rounded-[calc(1.5rem-0.375rem)] p-6">
+                <h3 className="font-semibold text-ink mb-5 flex items-center space-x-2 pb-3 border-b border-gray-100">
+                  <FiTruck className="text-primary-600" />
+                  <span>Thông tin giao hàng</span>
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-ink-secondary mb-1.5">Địa chỉ *</label>
+                    <div className="relative group">
+                      <FiMapPin className="absolute left-3.5 top-3 text-gray-400 group-focus-within:text-primary-500 transition-colors" />
+                      <textarea name="shippingAddress" value={formData.shippingAddress} onChange={handleChange}
+                        className="input-field pl-10" rows={2} placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" required />
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
-                  <div className="relative">
-                    <FiFileText className="absolute left-3 top-3 text-gray-400" />
-                    <textarea name="note" value={formData.note} onChange={handleChange}
-                      className="input-field pl-10" rows={2} placeholder="Ghi chú cho đơn hàng..." />
+                  <div>
+                    <label className="block text-sm font-medium text-ink-secondary mb-1.5">Số điện thoại *</label>
+                    <div className="relative group">
+                      <FiPhone className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-500 transition-colors" />
+                      <input type="tel" name="phone" value={formData.phone} onChange={handleChange}
+                        className="input-field pl-10" placeholder="0123 456 789" required />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-ink-secondary mb-1.5">Ghi chú</label>
+                    <div className="relative group">
+                      <FiFileText className="absolute left-3.5 top-3 text-gray-400 group-focus-within:text-primary-500 transition-colors" />
+                      <textarea name="note" value={formData.note} onChange={handleChange}
+                        className="input-field pl-10" rows={2} placeholder="Ghi chú cho đơn hàng..." />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -105,20 +109,22 @@ const CheckoutPage = () => {
 
             {/* Payment method */}
             <div className="card p-6">
-              <h3 className="font-semibold text-gray-900 mb-4 flex items-center space-x-2">
+              <h3 className="font-semibold text-ink mb-5 flex items-center space-x-2 pb-3 border-b border-gray-100">
                 <FiCreditCard className="text-primary-600" />
                 <span>Phương thức thanh toán</span>
               </h3>
               <div className="space-y-3">
                 {PAYMENT_METHODS.map((method) => (
-                  <label key={method.value} className={`flex items-start p-4 border rounded-lg cursor-pointer transition-colors ${
-                    formData.paymentMethod === method.value ? 'border-primary-600 bg-primary-50' : 'border-gray-200 hover:border-gray-300'
+                  <label key={method.value} className={`flex items-start p-4 rounded-xl border cursor-pointer transition-all duration-200 ${
+                    formData.paymentMethod === method.value 
+                      ? 'border-primary-600 bg-primary-50 ring-1 ring-primary-600/20' 
+                      : 'border-gray-200 hover:border-gray-300 hover:bg-surface-secondary'
                   }`}>
                     <input type="radio" name="paymentMethod" value={method.value} checked={formData.paymentMethod === method.value}
-                      onChange={handleChange} className="mt-1 text-primary-600" />
+                      onChange={handleChange} className="mt-0.5 text-primary-600 focus:ring-primary-500" />
                     <div className="ml-3">
-                      <p className="font-medium text-gray-900">{method.label}</p>
-                      <p className="text-sm text-gray-500">{method.desc}</p>
+                      <p className="font-medium text-ink text-sm">{method.label}</p>
+                      <p className="text-xs text-ink-tertiary mt-0.5">{method.desc}</p>
                     </div>
                   </label>
                 ))}
@@ -127,13 +133,13 @@ const CheckoutPage = () => {
           </div>
 
           {/* Order summary */}
-          <div className="card p-6 h-fit">
-            <h3 className="font-semibold text-gray-900 mb-4">Đơn hàng</h3>
-            <div className="space-y-3 mb-4">
+          <div className="card p-6 h-fit sticky top-24">
+            <h3 className="font-semibold text-ink mb-5 pb-3 border-b border-gray-100">Đơn hàng</h3>
+            <div className="space-y-3 mb-6">
               {items.map((item) => (
                 <div key={item.product.id} className="flex justify-between text-sm">
-                  <span className="text-gray-600 truncate">{item.product.name} x{item.quantity}</span>
-                  <span className="font-medium ml-2">
+                  <span className="text-ink-secondary truncate min-w-0">{item.product.name} <span className="text-ink-tertiary">x{item.quantity}</span></span>
+                  <span className="font-medium text-ink ml-2 flex-shrink-0">
                     {((item.product.discountPrice || item.product.price) * item.quantity).toLocaleString('vi-VN')}₫
                   </span>
                 </div>
@@ -141,15 +147,15 @@ const CheckoutPage = () => {
             </div>
             <div className="border-t pt-3 space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-600">Tạm tính</span>
-                <span>{total.toLocaleString('vi-VN')}₫</span>
+                <span className="text-ink-secondary">Tạm tính</span>
+                <span className="font-medium text-ink">{total.toLocaleString('vi-VN')}₫</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Phí vận chuyển</span>
-                <span>{shippingFee === 0 ? 'Miễn phí' : `${shippingFee.toLocaleString('vi-VN')}₫`}</span>
+                <span className="text-ink-secondary">Phí vận chuyển</span>
+                <span className="font-medium text-ink">{shippingFee === 0 ? 'Miễn phí' : `${shippingFee.toLocaleString('vi-VN')}₫`}</span>
               </div>
               <div className="border-t pt-2 flex justify-between text-lg font-bold">
-                <span>Tổng cộng</span>
+                <span className="text-ink">Tổng cộng</span>
                 <span className="text-primary-600">{finalAmount.toLocaleString('vi-VN')}₫</span>
               </div>
             </div>

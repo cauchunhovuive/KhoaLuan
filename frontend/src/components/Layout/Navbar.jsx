@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { FiSearch, FiShoppingCart, FiUser, FiLogOut, FiMenu, FiX, FiPackage } from 'react-icons/fi';
+import { FiSearch, FiShoppingCart, FiUser, FiLogOut, FiMenu, FiX } from 'react-icons/fi';
 import { logout } from '../../store/authSlice';
 
 const Navbar = () => {
@@ -27,69 +27,80 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="bg-white shadow-sm border-b border-gray-100 sticky top-0 z-50">
+    <nav className="glass sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2">
-            <FiPackage className="text-primary-600 text-2xl" />
-            <span className="text-xl font-bold text-gray-900">{settings.siteName}</span>
+          <Link to="/" className="flex items-center space-x-2.5 group">
+            <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center group-hover:bg-primary-700 transition-colors">
+              <span className="text-white font-bold text-sm">K</span>
+            </div>
+            <span className="text-lg font-semibold text-ink">{settings.siteName}</span>
           </Link>
 
           {/* Search - Desktop */}
-          <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-lg mx-8">
+          <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-md mx-8">
             <div className="relative w-full">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Tìm kiếm sản phẩm..."
-                className="input-field pl-10"
+                className="w-full pl-10 pr-4 py-2 bg-surface-secondary border border-gray-200 rounded-xl text-sm text-ink
+                  placeholder:text-gray-400
+                  focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500
+                  transition-all duration-200"
               />
-              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
             </div>
           </form>
 
           {/* Nav Items - Desktop */}
-          <div className="hidden md:flex items-center space-x-6">
-            <Link to="/products" className="text-gray-600 hover:text-primary-600 transition-colors">
+          <div className="hidden md:flex items-center space-x-1">
+            <Link to="/products" className="px-3.5 py-2 text-sm text-ink-secondary hover:text-ink hover:bg-surface-tertiary rounded-xl transition-all duration-200">
               Sản phẩm
             </Link>
 
-            <Link to="/cart" className="relative text-gray-600 hover:text-primary-600 transition-colors">
-              <FiShoppingCart className="text-xl" />
+            <Link to="/cart" className="relative p-2.5 text-ink-secondary hover:text-ink hover:bg-surface-tertiary rounded-xl transition-all duration-200">
+              <FiShoppingCart className="text-lg" />
               {count > 0 && (
-                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
-                  {count}
+                <span className="absolute -top-0.5 -right-0.5 bg-primary-600 text-white text-[10px] font-semibold w-5 h-5 rounded-full flex items-center justify-center shadow-sm">
+                  {count > 99 ? '99+' : count}
                 </span>
               )}
             </Link>
 
             {isAuthenticated ? (
               <div className="relative group">
-                <button className="flex items-center space-x-1 text-gray-600 hover:text-primary-600 transition-colors">
-                  <FiUser className="text-xl" />
-                  <span className="text-sm">{user?.name || 'Tài khoản'}</span>
+                <button className="flex items-center space-x-2 px-3.5 py-2 text-sm text-ink-secondary hover:text-ink hover:bg-surface-tertiary rounded-xl transition-all duration-200">
+                  <FiUser className="text-lg" />
+                  <span className="max-w-[100px] truncate">{user?.name || 'Tài khoản'}</span>
                 </button>
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-                  <Link to="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                <div className="absolute right-0 mt-1.5 w-52 bg-white rounded-xl shadow-premium-lg border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 py-1.5 z-50">
+                  <Link to="/profile" className="block px-4 py-2 text-sm text-ink-secondary hover:text-ink hover:bg-surface-secondary transition-colors">
                     Thông tin cá nhân
                   </Link>
-                  {user?.role !== 'ADMIN' && (
-                    <Link to="/orders" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                  {(user?.role === 'CUSTOMER' || !user?.role) && (
+                    <Link to="/orders" className="block px-4 py-2 text-sm text-ink-secondary hover:text-ink hover:bg-surface-secondary transition-colors">
                       Đơn hàng của tôi
                     </Link>
                   )}
+                  {user?.role === 'PARTNER' && (
+                    <Link to="/partner" className="block px-4 py-2 text-sm text-emerald-600 hover:bg-surface-secondary transition-colors font-medium">
+                      Kênh đối tác
+                    </Link>
+                  )}
                   {user?.role === 'ADMIN' && (
-                    <Link to="/admin" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 border-t">
+                    <Link to="/admin" className="block px-4 py-2 text-sm text-primary-600 hover:bg-surface-secondary transition-colors font-medium">
                       Quản trị
                     </Link>
                   )}
+                  <hr className="my-1.5 border-gray-100" />
                   <button
                     onClick={handleLogout}
-                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2 border-t"
+                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center space-x-2"
                   >
-                    <FiLogOut />
+                    <FiLogOut className="text-sm" />
                     <span>Đăng xuất</span>
                   </button>
                 </div>
@@ -104,16 +115,16 @@ const Navbar = () => {
           {/* Mobile menu button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden text-gray-600"
+            className="md:hidden p-2.5 text-ink-secondary hover:text-ink hover:bg-surface-tertiary rounded-xl transition-all"
           >
-            {mobileMenuOpen ? <FiX className="text-xl" /> : <FiMenu className="text-xl" />}
+            {mobileMenuOpen ? <FiX className="text-lg" /> : <FiMenu className="text-lg" />}
           </button>
         </div>
       </div>
 
       {/* Mobile menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-white border-t border-gray-100 px-4 py-4 space-y-4">
+        <div className="md:hidden bg-white border-t border-gray-100 px-4 py-4 space-y-3 animate-in">
           <form onSubmit={handleSearch}>
             <div className="relative">
               <input
@@ -121,40 +132,48 @@ const Navbar = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Tìm kiếm sản phẩm..."
-                className="input-field pl-10"
+                className="w-full pl-10 pr-4 py-2.5 bg-surface-secondary border border-gray-200 rounded-xl text-sm
+                  focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500
+                  transition-all"
               />
-              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
             </div>
           </form>
 
-          <Link to="/products" className="block text-gray-600 py-2" onClick={() => setMobileMenuOpen(false)}>
+          <Link to="/products" className="block px-3 py-2.5 text-ink-secondary hover:text-ink hover:bg-surface-secondary rounded-xl transition-colors" onClick={() => setMobileMenuOpen(false)}>
             Sản phẩm
           </Link>
-          <Link to="/cart" className="block text-gray-600 py-2" onClick={() => setMobileMenuOpen(false)}>
-            Giỏ hàng {count > 0 && `(${count})`}
+          <Link to="/cart" className="block px-3 py-2.5 text-ink-secondary hover:text-ink hover:bg-surface-secondary rounded-xl transition-colors" onClick={() => setMobileMenuOpen(false)}>
+            Giỏ hàng {count > 0 && <span className="ml-1 text-primary-600 font-medium">({count})</span>}
           </Link>
 
           {isAuthenticated ? (
             <>
-              <Link to="/profile" className="block text-gray-600 py-2" onClick={() => setMobileMenuOpen(false)}>
+              <hr className="border-gray-100" />
+              <Link to="/profile" className="block px-3 py-2.5 text-ink-secondary hover:text-ink hover:bg-surface-secondary rounded-xl transition-colors" onClick={() => setMobileMenuOpen(false)}>
                 Thông tin cá nhân
               </Link>
-              {user?.role !== 'ADMIN' && (
-                <Link to="/orders" className="block text-gray-600 py-2" onClick={() => setMobileMenuOpen(false)}>
+              {(user?.role === 'CUSTOMER' || !user?.role) && (
+                <Link to="/orders" className="block px-3 py-2.5 text-ink-secondary hover:text-ink hover:bg-surface-secondary rounded-xl transition-colors" onClick={() => setMobileMenuOpen(false)}>
                   Đơn hàng
                 </Link>
               )}
+              {user?.role === 'PARTNER' && (
+                <Link to="/partner" className="block px-3 py-2.5 text-emerald-600 font-medium hover:bg-surface-secondary rounded-xl transition-colors" onClick={() => setMobileMenuOpen(false)}>
+                  Kênh đối tác
+                </Link>
+              )}
               {user?.role === 'ADMIN' && (
-                <Link to="/admin" className="block text-primary-600 py-2" onClick={() => setMobileMenuOpen(false)}>
+                <Link to="/admin" className="block px-3 py-2.5 text-primary-600 font-medium hover:bg-surface-secondary rounded-xl transition-colors" onClick={() => setMobileMenuOpen(false)}>
                   Quản trị
                 </Link>
               )}
-              <button onClick={handleLogout} className="block text-red-600 py-2 w-full text-left">
+              <button onClick={handleLogout} className="w-full text-left px-3 py-2.5 text-red-600 hover:bg-red-50 rounded-xl transition-colors">
                 Đăng xuất
               </button>
             </>
           ) : (
-            <Link to="/login" className="block text-primary-600 py-2" onClick={() => setMobileMenuOpen(false)}>
+            <Link to="/login" className="btn-primary w-full text-center" onClick={() => setMobileMenuOpen(false)}>
               Đăng nhập
             </Link>
           )}

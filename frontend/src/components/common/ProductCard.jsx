@@ -21,54 +21,59 @@ const ProductCard = ({ product }) => {
   const hasDiscount = product.discountPrice && product.discountPrice < product.price;
 
   return (
-    <Link to={`/products/${product.slug}`} className="card group overflow-hidden">
+    <Link to={`/products/${product.slug}`} className="group card-hover overflow-hidden flex flex-col">
       {/* Image */}
-      <div className="relative aspect-square bg-gray-100 overflow-hidden">
+      <div className="relative aspect-square bg-surface-secondary overflow-hidden">
         {product.images?.[0] ? (
           <img
             src={product.images[0]}
             alt={product.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            loading="lazy"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-400">
+          <div className="w-full h-full flex items-center justify-center text-gray-300">
             <FiShoppingCart className="text-4xl" />
           </div>
         )}
 
+        {/* Discount badge */}
         {hasDiscount && (
-          <span className="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">
+          <span className="absolute top-3 left-3 bg-red-500 text-white text-[11px] font-semibold px-2.5 py-1 rounded-lg shadow-sm">
             -{Math.round((1 - product.discountPrice / product.price) * 100)}%
           </span>
         )}
 
+        {/* Quick add to cart */}
         <button
           onClick={handleAddToCart}
-          className="absolute bottom-2 right-2 bg-white shadow-lg rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-primary-600 hover:text-white"
+          className="absolute bottom-3 right-3 w-9 h-9 bg-white shadow-premium-md rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-200 hover:bg-primary-600 hover:text-white"
         >
-          <FiShoppingCart className="text-lg" />
+          <FiShoppingCart className="text-sm" />
         </button>
       </div>
 
       {/* Info */}
-      <div className="p-4">
-        <p className="text-xs text-gray-500 mb-1">{product.category?.name || ''}</p>
-        <h3 className="text-sm font-medium text-gray-900 line-clamp-2 mb-2 group-hover:text-primary-600 transition-colors">
+      <div className="p-4 flex flex-col flex-1">
+        {product.category?.name && (
+          <p className="text-[11px] font-medium text-ink-tertiary uppercase tracking-wider mb-1.5">{product.category.name}</p>
+        )}
+        <h3 className="text-sm font-medium text-ink leading-snug line-clamp-2 mb-2 group-hover:text-primary-600 transition-colors flex-1">
           {product.name}
         </h3>
 
-        <div className="flex items-center space-x-1 mb-2">
-          <FiStar className="text-yellow-400 text-xs" />
-          <span className="text-xs text-gray-600">{product.rating?.toFixed(1) || '0.0'}</span>
-          <span className="text-xs text-gray-400">({product.soldCount || 0} đã bán)</span>
+        <div className="flex items-center space-x-1.5 mb-2.5">
+          <FiStar className="text-yellow-500 text-[10px]" />
+          <span className="text-xs text-ink-secondary font-medium">{product.rating?.toFixed(1) || '0.0'}</span>
+          <span className="text-xs text-ink-tertiary">({product.soldCount || 0} đã bán)</span>
         </div>
 
         <div className="flex items-center space-x-2">
-          <span className="text-lg font-bold text-primary-600">
+          <span className="text-base font-bold text-primary-600">
             {price.toLocaleString('vi-VN')}₫
           </span>
           {hasDiscount && (
-            <span className="text-sm text-gray-400 line-through">
+            <span className="text-xs text-ink-tertiary line-through">
               {product.price.toLocaleString('vi-VN')}₫
             </span>
           )}

@@ -1,0 +1,58 @@
+name: redesign-existing-projects
+description: Upgrades existing websites and apps to premium quality. Audits current design, identifies generic AI patterns, and applies high-end design standards without breaking functionality. Works with any CSS framework or vanilla CSS.
+
+# Redesign Existing Projects Skill
+
+## Overview
+A comprehensive redesign skill that audits existing codebases, identifies generic patterns, and applies targeted premium upgrades without breaking functionality. Works with Tailwind, vanilla CSS, styled-components, or any framework.
+
+## Workflow
+1. **Scan** - Read codebase, identify framework and current patterns
+2. **Diagnose** - Run design audit across typography, color, layout, interactivity, content
+3. **Fix** - Apply targeted upgrades working with the existing stack
+
+## Design Audit Categories
+
+### Typography
+- Replace browser default fonts with premium options (Geist, Outfit, Satoshi)
+- Increase headline presence with tighter tracking and reduced line-height
+- Limit body text width to ~65 characters
+- Add Medium (500) and SemiBold (600) weights
+
+### Color & Surfaces
+- Replace pure black with off-black/dark charcoal
+- Desaturate accent colors (below 80%)
+- Pick ONE accent color and stick with it
+- Tint shadows to match background hue
+- Add subtle noise/grain textures
+
+### Layout
+- Break symmetry with offset margins and mixed aspect ratios
+- Replace 3-column feature cards with asymmetric grids
+- Use min-h-[100dvh] instead of h-screen
+- Use CSS Grid instead of complex flexbox math
+
+### Interactivity
+- Add hover states, active/pressed feedback
+- Smooth transitions (200-300ms)
+- Skeleton loaders instead of spinners
+- Empty states and error states
+
+## Fix Priority
+1. Font swap (biggest instant improvement)
+2. Color palette cleanup
+3. Hover and active states
+4. Layout and spacing
+5. Replace generic components
+6. Add loading/empty/error states
+7. Polish typography scale and spacing
+
+## Rules
+- Work with existing tech stack, don't migrate
+- Don't break existing functionality
+- Check dependency files before importing libraries
+- Keep changes reviewable and focused
+
+## Source
+- GitHub: Leonxlnx/taste-skill
+- Path: skills/redesign-skill/SKILL.md

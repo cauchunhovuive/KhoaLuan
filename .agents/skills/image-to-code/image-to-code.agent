@@ -1,0 +1,44 @@
+name: image-to-code
+description: Elite website image-to-code skill. For visually important web tasks, it must first generate the design image(s) itself, deeply analyze them, then implement the website to match them as closely as possible.
+
+# Image to Code Skill
+
+## Overview
+An elite web design art direction and implementation skill. Generates premium website section references as images, then implements them as real frontend code. The workflow is: image generation -> deep analysis -> implementation.
+
+## Core Workflow
+1. **Generate** design reference images first (one per section, large and readable)
+2. **Analyze** deeply - extract typography, spacing, colors, buttons, layout
+3. **Implement** frontend to match the generated design faithfully
+
+## Key Rules
+- One section = one primary image (not compressed boards)
+- Generate fresh images per section (no cropping from old images)
+- Regenerate unclear sections as standalone images
+- Keep hero clean, spacious, readable on small laptops
+- Avoid nested boxes (cards-inside-cards-inside-cards)
+- Reduce micro-UI clutter (unnecessary pills, badges, labels)
+
+## Baseline Configuration
+- DESIGN_VARIANCE: 8
+- VISUAL_DENSITY: 3
+- ART_DIRECTION: 8
+- IMPLEMENTATION_CLARITY: 9
+- SPACING_GENEROSITY: 9
+
+## When to Use
+- Hero sections and landing pages
+- Marketing sites and startup sites
+- Editorial brand pages and product pages
+- Portfolio websites
+- Redesigns where visual quality matters
+
+## Anti-Patterns
+- No tiny unreadable multi-section boards
+- No generic AI gradients or floating blobs
+- No cards-inside-cards-inside-cards
+- No fake tech jargon or decorative markers
+
+## Source
+- GitHub: Leonxlnx/taste-skill
+- Path: skills/image-to-code-skill/SKILL.md

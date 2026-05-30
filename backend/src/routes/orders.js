@@ -8,6 +8,6 @@ router.get('/', protect, getMyOrders);
 router.post('/', protect, createOrder);
 router.get('/:id', protect, getOrder);
 router.put('/:id/cancel', protect, cancelOrder);
-router.put('/:id/status', protect, restrictTo('ADMIN'), updateOrderStatus);
+router.put('/:id/status', protect, restrictTo('ADMIN', 'PARTNER'), updateOrderStatus);
 
 module.exports = router;

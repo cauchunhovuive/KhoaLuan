@@ -22,32 +22,39 @@ const SearchPage = () => {
   }, [dispatch, query, page]);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="section-container py-8 animate-fade-in">
+      {/* Back + Search info */}
       <div className="mb-8">
-        <Link to="/products" className="text-gray-600 hover:text-primary-600 flex items-center space-x-1 mb-4">
-          <FiArrowLeft /><span>Tất cả sản phẩm</span>
+        <Link to="/products" className="inline-flex items-center space-x-1.5 text-ink-tertiary hover:text-primary-600 mb-5 transition-colors">
+          <FiArrowLeft />
+          <span>Tất cả sản phẩm</span>
         </Link>
-        <div className="flex items-center space-x-3">
-          <FiSearch className="text-gray-400 text-xl" />
-          <h1 className="text-2xl font-bold text-gray-900">
-            Kết quả tìm kiếm: "{query}"
-          </h1>
+        <div className="flex items-center space-x-3 mb-1">
+          <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center">
+            <FiSearch className="text-primary-600 text-lg" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-ink">
+              Kết quả tìm kiếm
+            </h1>
+            <p className="text-sm text-ink-tertiary">Từ khóa: "<span className="font-medium text-ink">{query}</span>"</p>
+          <p className="text-xs text-ink-tertiary mt-0.5">{pagination.total} kết quả</p>
+          </div>
         </div>
-        <p className="text-gray-600 mt-2">{pagination.total} kết quả</p>
       </div>
 
       {loading ? (
-        <LoadingSpinner />
+        <LoadingSpinner size="skeleton" />
       ) : products.length === 0 ? (
-        <div className="text-center py-16">
+        <div className="flex flex-col items-center justify-center py-20 text-center">
           <FiSearch className="text-6xl text-gray-300 mx-auto mb-4" />
-          <h2 className="text-lg font-medium text-gray-900 mb-2">Không tìm thấy sản phẩm</h2>
-          <p className="text-gray-500 mb-6">Thử tìm kiếm với từ khóa khác</p>
+          <h2 className="text-lg font-semibold text-ink mb-2">Không tìm thấy sản phẩm</h2>
+          <p className="text-ink-secondary mb-6">Thử tìm kiếm với từ khóa khác</p>
           <Link to="/products" className="btn-primary">Xem tất cả sản phẩm</Link>
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 stagger-fade">
             {products.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}

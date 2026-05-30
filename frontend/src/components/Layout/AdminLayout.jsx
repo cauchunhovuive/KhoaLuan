@@ -4,7 +4,8 @@ import { useSelector, useDispatch } from 'react-redux';
 import {
   FiHome, FiPackage, FiGrid, FiShoppingBag, FiUsers,
   FiPieChart, FiTrendingUp, FiSettings, FiLogOut,
-  FiMenu, FiX, FiChevronLeft, FiBell, FiCheck, FiClock,
+  FiMenu, FiChevronLeft, FiBell, FiCheck, FiClock,
+  FiUserCheck,
 } from 'react-icons/fi';
 import { logout } from '../../store/authSlice';
 import { fetchNotifications, markAsRead, markAllAsRead } from '../../store/notificationSlice';
@@ -15,6 +16,7 @@ const sidebarItems = [
   { icon: FiGrid, label: 'Danh mục', path: '/admin/categories' },
   { icon: FiShoppingBag, label: 'Đơn hàng', path: '/admin/orders' },
   { icon: FiUsers, label: 'Người dùng', path: '/admin/users' },
+  { icon: FiUserCheck, label: 'Đối tác', path: '/admin/partners' },
   { icon: FiPieChart, label: 'Phân cụm', path: '/admin/clusters' },
   { icon: FiTrendingUp, label: 'Gợi ý', path: '/admin/recommendations' },
   { icon: FiSettings, label: 'Cài đặt', path: '/admin/settings' },
@@ -31,33 +33,23 @@ const AdminLayout = () => {
   const { siteName } = useSelector((state) => state.settings);
   const { notifications, unreadCount } = useSelector((state) => state.notifications);
 
-  // Fetch notifications on mount + poll every 30s
   useEffect(() => {
     dispatch(fetchNotifications());
-    const interval = setInterval(() => {
-      dispatch(fetchNotifications());
-    }, 30000);
+    const interval = setInterval(() => dispatch(fetchNotifications()), 30000);
     return () => clearInterval(interval);
   }, [dispatch]);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (notifRef.current && !notifRef.current.contains(e.target)) {
-        setNotifOpen(false);
-      }
+      if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const handleNotificationClick = async (notif) => {
-    if (!notif.isRead) {
-      dispatch(markAsRead(notif.id));
-    }
-    if (notif.type === 'ORDER' && notif.referenceId) {
-      navigate('/admin/orders');
-    }
+    if (!notif.isRead) dispatch(markAsRead(notif.id));
+    if (notif.type === 'ORDER' && notif.referenceId) navigate('/admin/orders');
     setNotifOpen(false);
   };
 
@@ -79,52 +71,70 @@ const AdminLayout = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex">
+    <div className="min-h-[100dvh] bg-surface-secondary flex">
       {/* Sidebar */}
-      <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-white shadow-sm border-r border-gray-200 transition-all duration-300 flex flex-col`}>
+      <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-white border-r border-gray-100 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] flex flex-col flex-shrink-0`}>
         <div className="h-16 flex items-center justify-between px-4 border-b border-gray-100">
+          <Link to="/" className={`flex items-center space-x-2.5 ${!sidebarOpen && 'mx-auto'}`}>
+            <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center flex-shrink-0">
+              <span className="text-white font-bold text-sm">K</span>
+            </div>
+            {sidebarOpen && <span className="text-base font-bold text-ink">{siteName}</span>}
+          </Link>
           {sidebarOpen && (
-            <Link to="/" className="text-lg font-bold text-gray-900">{siteName}</Link>
+            <button onClick={() => setSidebarOpen(false)} className="text-gray-400 hover:text-ink-secondary transition-colors">
+              <FiChevronLeft />
+            </button>
           )}
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-gray-500 hover:text-gray-700">
-            {sidebarOpen ? <FiChevronLeft /> : <FiMenu />}
-          </button>
         </div>
 
-        <nav className="flex-1 py-4 px-2 space-y-1">
+        {!sidebarOpen && (
+          <button onClick={() => setSidebarOpen(true)} className="mx-auto mt-4 text-gray-400 hover:text-ink-secondary transition-colors">
+            <FiMenu />
+          </button>
+        )}
+
+        <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
           {sidebarItems.map((item) => {
             const isActive = location.pathname === item.path;
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center ${sidebarOpen ? 'space-x-3 px-3' : 'justify-center'} py-2.5 rounded-lg transition-colors ${
+                className={`flex items-center ${sidebarOpen ? 'space-x-3 px-3' : 'justify-center px-0'} py-2.5 rounded-xl transition-all duration-200 ${
                   isActive
-                    ? 'bg-primary-50 text-primary-700'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    ? 'bg-primary-50 text-primary-700 font-medium'
+                    : 'text-ink-secondary hover:bg-surface-tertiary hover:text-ink'
                 }`}
                 title={!sidebarOpen ? item.label : undefined}
               >
-                <item.icon className="text-xl flex-shrink-0" />
-                {sidebarOpen && <span className="text-sm font-medium">{item.label}</span>}
+                <item.icon className={`text-lg flex-shrink-0 ${isActive ? 'text-primary-600' : ''}`} />
+                {sidebarOpen && <span className="text-sm">{item.label}</span>}
               </Link>
             );
           })}
         </nav>
 
-        <div className="border-t border-gray-200 p-4">
+        <div className="border-t border-gray-100 p-4">
           {sidebarOpen ? (
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-gray-900 truncate">{user?.name}</p>
-              <p className="text-xs text-gray-500">{user?.email}</p>
-              <button onClick={handleLogout} className="flex items-center space-x-2 text-sm text-red-600 hover:text-red-700">
-                <FiLogOut />
+            <div className="space-y-3">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <span className="text-xs font-bold text-primary-600">{user?.name?.[0] || 'A'}</span>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-ink truncate">{user?.name}</p>
+                  <p className="text-xs text-ink-tertiary truncate">{user?.email}</p>
+                </div>
+              </div>
+              <button onClick={handleLogout} className="flex items-center space-x-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl px-3 py-2 w-full transition-colors">
+                <FiLogOut className="text-sm" />
                 <span>Đăng xuất</span>
               </button>
             </div>
           ) : (
-            <button onClick={handleLogout} className="w-full flex justify-center text-red-600" title="Đăng xuất">
-              <FiLogOut className="text-xl" />
+            <button onClick={handleLogout} className="w-full flex justify-center text-red-600 hover:bg-red-50 rounded-xl py-2 transition-colors" title="Đăng xuất">
+              <FiLogOut className="text-lg" />
             </button>
           )}
         </div>
@@ -132,20 +142,20 @@ const AdminLayout = () => {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 bg-white shadow-sm border-b border-gray-200 px-6 flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-gray-900">
+        <header className="h-16 bg-white/80 backdrop-blur-xl border-b border-gray-100 px-6 flex items-center justify-between sticky top-0 z-20">
+          <h1 className="text-base font-semibold text-ink">
             {sidebarItems.find((item) => item.path === location.pathname)?.label || 'Quản trị'}
           </h1>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3">
             {/* Notification Bell */}
             <div className="relative" ref={notifRef}>
               <button
                 onClick={() => setNotifOpen(!notifOpen)}
-                className="relative p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-lg transition-colors"
+                className="relative p-2.5 text-ink-secondary hover:text-primary-600 hover:bg-surface-tertiary rounded-xl transition-all duration-200"
               >
-                <FiBell className="text-xl" />
+                <FiBell className="text-lg" />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-sm">
+                  <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-premium-sm">
                     {unreadCount > 99 ? '99+' : unreadCount}
                   </span>
                 )}
@@ -153,15 +163,15 @@ const AdminLayout = () => {
 
               {/* Dropdown */}
               {notifOpen && (
-                <div className="absolute right-0 mt-2 w-96 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                    <h3 className="text-sm font-semibold text-gray-900">
+                <div className="absolute right-0 mt-2 w-96 bg-white rounded-2xl shadow-premium-xl border border-gray-100 z-50 overflow-hidden">
+                  <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+                    <h3 className="text-sm font-semibold text-ink">
                       Thông báo {unreadCount > 0 && `(${unreadCount})`}
                     </h3>
                     {unreadCount > 0 && (
                       <button
                         onClick={() => dispatch(markAllAsRead())}
-                        className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                        className="text-xs text-primary-600 hover:text-primary-700 font-medium transition-colors"
                       >
                         Đã đọc tất cả
                       </button>
@@ -169,7 +179,7 @@ const AdminLayout = () => {
                   </div>
                   <div className="max-h-96 overflow-y-auto">
                     {notifications.length === 0 ? (
-                      <div className="px-4 py-10 text-center text-gray-400">
+                      <div className="px-5 py-12 text-center text-gray-400">
                         <FiCheck className="mx-auto text-2xl mb-2" />
                         <p className="text-sm">Không có thông báo</p>
                       </div>
@@ -178,22 +188,22 @@ const AdminLayout = () => {
                         <button
                           key={notif.id}
                           onClick={() => handleNotificationClick(notif)}
-                          className={`w-full text-left px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors ${
-                            !notif.isRead ? 'bg-primary-50/50' : ''
+                          className={`w-full text-left px-5 py-3.5 border-b border-gray-50 hover:bg-surface-secondary transition-colors ${
+                            !notif.isRead ? 'bg-primary-50/40' : ''
                           }`}
                         >
                           <div className="flex items-start space-x-3">
-                            <div className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${
+                            <div className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${
                               !notif.isRead ? 'bg-primary-500' : 'bg-transparent'
                             }`} />
                             <div className="flex-1 min-w-0">
-                              <p className={`text-sm ${!notif.isRead ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>
+                              <p className={`text-sm ${!notif.isRead ? 'font-semibold text-ink' : 'text-ink-secondary'}`}>
                                 {notif.title}
                               </p>
                               {notif.message && (
-                                <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{notif.message}</p>
+                                <p className="text-xs text-ink-tertiary mt-0.5 line-clamp-2">{notif.message}</p>
                               )}
-                              <p className="text-[11px] text-gray-400 mt-1 flex items-center space-x-1">
+                              <p className="text-[11px] text-gray-400 mt-1.5 flex items-center space-x-1">
                                 <FiClock className="inline" />
                                 <span>{formatTime(notif.createdAt)}</span>
                               </p>
@@ -207,13 +217,13 @@ const AdminLayout = () => {
               )}
             </div>
 
-            <Link to="/" className="text-sm text-primary-600 hover:text-primary-700">
-              Về trang chủ
+            <Link to="/" className="text-sm text-ink-tertiary hover:text-primary-600 transition-colors px-3 py-2 rounded-xl hover:bg-surface-tertiary">
+              Trang chủ
             </Link>
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-6 bg-surface-secondary">
           <Outlet />
         </main>
       </div>

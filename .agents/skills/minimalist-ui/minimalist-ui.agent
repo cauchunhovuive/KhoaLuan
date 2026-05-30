@@ -1,0 +1,44 @@
+name: minimalist-ui
+description: Clean editorial-style interfaces. Warm monochrome palette, typographic contrast, flat bento grids, muted pastels. No gradients, no heavy shadows.
+
+# Minimalist UI Skill
+
+## Overview
+A premium utilitarian minimalism protocol for generating highly refined, ultra-minimalist, document-style web interfaces. Enforces high-contrast warm monochrome palettes, bespoke typographic hierarchies, and meticulous structural macro-whitespace.
+
+## Key Features
+- **Warm Monochrome Palette**: Canvas (#FFFFFF/#F7F6F3), surface (#FFFFFF/#F9F9F8), borders (#EAEAEA)
+- **Editorial Typography**: Serif for headings, clean sans for body, mono for code
+- **Bento Grid Layouts**: Asymmetrical CSS Grid with 1px borders and generous padding
+- **Muted Pastel Accents**: Pale red, blue, green, yellow for tags and badges
+- **Ultra-Flat Components**: No heavy shadows, no gradients, no glassmorphism
+
+## Banned Elements
+- Inter, Roboto, Open Sans fonts
+- Lucide/Feather/Heroicons (use Phosphor Bold or Radix UI)
+- Tailwind default shadows (shadow-md/lg/xl)
+- Gradient, neon colors, glassmorphism
+- Rounded-full for containers/cards/primary buttons
+- Emojis anywhere
+
+## Typography Architecture
+- Sans-serif: SF Pro Display, Geist Sans, Switzer
+- Editorial Serif: Lyon Text, Newsreader, Playfair Display
+- Monospace: Geist Mono, SF Mono, JetBrains Mono
+- Text colors: off-black #111111, muted #787774
+
+## When to Use
+- Editorial and publication-style websites
+- Clean SaaS dashboards and admin panels
+- Portfolio sites needing restrained elegance
+- Any project where "less is more" applies
+
+## Subtle Motion Guidelines
+- Scroll entry: translateY(12px) + opacity over 600ms
+- Hover: subtle shadow shift, scale(0.98) on active
+- Staggered reveals with cascade delays
+- Background ambient motion (slow radial gradient blobs)
+
+## Source
+- GitHub: Leonxlnx/taste-skill
+- Path: skills/minimalist-skill/SKILL.md

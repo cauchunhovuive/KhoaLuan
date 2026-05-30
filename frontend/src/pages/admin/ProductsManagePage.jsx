@@ -48,72 +48,82 @@ const ProductsManagePage = () => {
   };
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">Quản lý sản phẩm</h2>
-        <button className="btn-primary flex items-center space-x-2">
-          <FiPlus /><span>Thêm sản phẩm</span>
+    <div className="animate-fade-in space-y-5">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-ink">Quản lý sản phẩm</h2>
+          <p className="text-ink-tertiary text-sm mt-1">Quản lý danh sách sản phẩm</p>
+        </div>
+        <button className="btn-primary inline-flex items-center space-x-2">
+          <FiPlus className="text-sm" />
+          <span>Thêm sản phẩm</span>
         </button>
       </div>
 
-      <div className="card p-4 mb-6">
+      {/* Search */}
+      <div className="card p-4">
         <div className="relative">
-          <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
           <input type="text" placeholder="Tìm kiếm sản phẩm..." value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            className="input-field pl-10" />
+            className="w-full pl-11 pr-4 py-2.5 bg-surface-secondary border border-gray-200 rounded-xl text-sm text-ink placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200" />
         </div>
       </div>
 
-      {loading ? <LoadingSpinner /> : (
+      {loading ? <LoadingSpinner size="table" /> : (
         <>
           <div className="card overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 text-left text-gray-500">
-                  <th className="p-4 font-medium">Sản phẩm</th>
-                  <th className="p-4 font-medium">Danh mục</th>
-                  <th className="p-4 font-medium">Giá</th>
-                  <th className="p-4 font-medium">Tồn kho</th>
-                  <th className="p-4 font-medium">Đã bán</th>
-                  <th className="p-4 font-medium">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {products.map((product) => (
-                  <tr key={product.id} className="border-t border-gray-100 hover:bg-gray-50">
-                    <td className="p-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
-                          {product.images?.[0] && <img src={product.images[0]} alt="" className="w-full h-full object-cover" />}
-                        </div>
-                        <span className="font-medium text-gray-900">{product.name}</span>
-                      </div>
-                    </td>
-                    <td className="p-4 text-gray-600">{product.category?.name}</td>
-                    <td className="p-4 font-medium">{product.price.toLocaleString('vi-VN')}₫</td>
-                    <td className="p-4">{product.stock}</td>
-                    <td className="p-4">{product.soldCount}</td>
-                    <td className="p-4">
-                      <div className="flex items-center space-x-2">
-                        <button className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg"><FiEdit2 /></button>
-                        <button onClick={() => handleDelete(product.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg"><FiTrash2 /></button>
-                      </div>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-surface-secondary text-left">
+                    <th className="p-4 font-medium text-ink-tertiary text-xs uppercase tracking-wider">Sản phẩm</th>
+                    <th className="p-4 font-medium text-ink-tertiary text-xs uppercase tracking-wider">Danh mục</th>
+                    <th className="p-4 font-medium text-ink-tertiary text-xs uppercase tracking-wider">Giá</th>
+                    <th className="p-4 font-medium text-ink-tertiary text-xs uppercase tracking-wider">Tồn kho</th>
+                    <th className="p-4 font-medium text-ink-tertiary text-xs uppercase tracking-wider">Đã bán</th>
+                    <th className="p-4 font-medium text-ink-tertiary text-xs uppercase tracking-wider">Thao tác</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {products.map((product) => (
+                    <tr key={product.id} className="border-t border-gray-100 hover:bg-surface-secondary/50 transition-colors">
+                      <td className="p-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 bg-surface-tertiary rounded-xl overflow-hidden flex-shrink-0 ring-1 ring-gray-100">
+                            {product.images?.[0] && <img src={product.images[0]} alt="" className="w-full h-full object-cover" />}
+                          </div>
+                          <span className="font-medium text-ink">{product.name}</span>
+                        </div>
+                      </td>
+                      <td className="p-4 text-ink-secondary">{product.category?.name || <span className="text-ink-tertiary">—</span>}</td>
+                      <td className="p-4 font-semibold text-ink">{product.price.toLocaleString('vi-VN')}₫</td>
+                      <td className="p-4">
+                        <span className={`font-medium ${product.stock <= 5 ? 'text-red-600' : 'text-ink'}`}>{product.stock}</span>
+                      </td>
+                      <td className="p-4 font-medium">{product.soldCount}</td>
+                      <td className="p-4">
+                        <div className="flex items-center space-x-1.5">
+                          <button className="p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"><FiEdit2 size={14} /></button>
+                          <button onClick={() => handleDelete(product.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-xl transition-colors"><FiTrash2 size={14} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-center space-x-2 mt-6">
+            <div className="flex items-center justify-center space-x-2 mt-4">
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="p-2 rounded-xl border border-gray-200 text-ink-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-all"
               >
                 <FiChevronLeft />
               </button>
@@ -121,10 +131,10 @@ const ProductsManagePage = () => {
                 <button
                   key={p}
                   onClick={() => setPage(p)}
-                  className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
+                  className={`w-9 h-9 rounded-xl text-sm font-medium transition-all ${
                     p === page
-                      ? 'bg-primary-600 text-white'
-                      : 'border border-gray-200 text-gray-600 hover:bg-gray-50'
+                      ? 'bg-primary-600 text-white shadow-premium-sm'
+                      : 'border border-gray-200 text-ink-secondary hover:bg-surface-secondary'
                   }`}
                 >
                   {p}
@@ -133,7 +143,7 @@ const ProductsManagePage = () => {
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-                className="p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="p-2 rounded-xl border border-gray-200 text-ink-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-all"
               >
                 <FiChevronRight />
               </button>

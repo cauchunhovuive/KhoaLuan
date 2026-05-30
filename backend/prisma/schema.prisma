@@ -10,6 +10,7 @@ datasource db {
 enum UserRole {
   CUSTOMER
   ADMIN
+  PARTNER
 }
 
 enum OrderStatus {
@@ -48,14 +49,25 @@ model User {
   totalSpent     Float     @default(0)
   orderCount     Int       @default(0)
   lastPurchaseAt DateTime?
+
+  // Partner fields
+  storeName        String?  // Tên cửa hàng
+  storeDescription String?  // Mô tả cửa hàng
+  taxCode          String?  // Mã số thuế
+  businessAddress  String?  // Địa chỉ kinh doanh
+  isApproved       Boolean  @default(false)  // Admin phê duyệt
+  approvedAt       DateTime?
+  rejectedReason   String?  // Lý do từ chối (nếu có)
+
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  orders      Order[]
-  reviews     Review[]
-  cartItems   CartItem[]
-  cluster     Cluster?       @relation(fields: [clusterId], references: [id])
+  orders          Order[]
+  reviews         Review[]
+  cartItems       CartItem[]
+  cluster         Cluster?       @relation(fields: [clusterId], references: [id])
   recommendations Recommendation[]
+  products        Product[]      @relation("PartnerProducts")
 }
 
 model Category {
@@ -85,10 +97,12 @@ model Product {
   reviewCount   Int      @default(0)
   isActive      Boolean  @default(true)
   categoryId    String
+  partnerId     String?  // Người hợp tác kinh doanh đăng sản phẩm
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   category    Category    @relation(fields: [categoryId], references: [id])
+  partner     User?       @relation("PartnerProducts", fields: [partnerId], references: [id])
   orderItems  OrderItem[]
   reviews     Review[]
   cartItems   CartItem[]
