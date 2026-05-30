@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FiUsers, FiPackage, FiShoppingBag, FiDollarSign, FiTrendingUp, FiPieChart, FiArrowUpRight } from 'react-icons/fi';
+import { FiUsers, FiPackage, FiShoppingBag, FiGrid, FiTrendingUp, FiArrowUpRight } from 'react-icons/fi';
 import api from '../../services/api';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 
@@ -26,8 +26,8 @@ const DashboardPage = () => {
   const overviewCards = [
     { icon: FiUsers, label: 'Người dùng', value: stats.overview.totalUsers, color: 'from-blue-500 to-blue-600', link: '/admin/users' },
     { icon: FiPackage, label: 'Sản phẩm', value: stats.overview.totalProducts, color: 'from-purple-500 to-purple-600', link: '/admin/products' },
-    { icon: FiShoppingBag, label: 'Đơn hàng', value: stats.overview.totalOrders, color: 'from-emerald-500 to-emerald-600', link: '/admin/orders' },
-    { icon: FiDollarSign, label: 'Doanh thu', value: `${(stats.overview.totalRevenue / 1000000).toFixed(1)}M`, color: 'from-amber-500 to-amber-600', link: '/admin/orders' },
+    { icon: FiShoppingBag, label: 'Đối tác', value: stats.overview.totalPartners, color: 'from-emerald-500 to-emerald-600', link: '/admin/partners' },
+    { icon: FiGrid, label: 'Danh mục', value: stats.overview.totalCategories, color: 'from-amber-500 to-amber-600', link: '/admin/categories' },
   ];
 
   return (
@@ -59,36 +59,6 @@ const DashboardPage = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Recent orders */}
-        <div className="card p-5">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h3 className="font-semibold text-ink">Đơn hàng gần đây</h3>
-              <p className="text-xs text-ink-secondary mt-0.5">{stats.recentOrders?.length || 0} đơn hàng</p>
-            </div>
-            <Link to="/admin/orders" className="text-xs font-medium text-primary-600 hover:text-primary-700 transition-colors flex items-center space-x-0.5 group">
-              <span>Xem tất cả</span>
-              <FiArrowUpRight className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-            </Link>
-          </div>
-          <div className="space-y-2">
-            {stats.recentOrders?.slice(0, 5).map((order) => (
-              <div key={order.id} className="flex items-center justify-between p-3 rounded-xl bg-surface-secondary hover:bg-surface-tertiary transition-colors">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center">
-                    <span className="text-[10px] font-mono font-bold text-primary-600">#{order.id.slice(0, 4)}</span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-ink">{order.user?.name || 'N/A'}</p>
-                    <p className="text-xs text-ink-tertiary">Đơn hàng #{order.id.slice(0, 8)}</p>
-                  </div>
-                </div>
-                <span className="text-sm font-bold text-ink">{order.finalAmount.toLocaleString('vi-VN')}₫</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
         {/* Cluster stats */}
         <div className="card p-5">
           <div className="flex items-center justify-between mb-5">

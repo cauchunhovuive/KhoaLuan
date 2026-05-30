@@ -22,7 +22,7 @@ const AuditLogPage = () => {
 
   const fetchLogs = () => {
     setLoading(true);
-    const params = { page, limit: 50 };
+    const params = { page, limit: 10 };
     if (actionFilter) params.action = actionFilter;
     if (entityFilter) params.entity = entityFilter;
     api.get('/audit', { params })

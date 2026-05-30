@@ -146,7 +146,7 @@ const PartnerCouponsPage = () => {
 
   const fetchCoupons = () => {
     setLoading(true);
-    api.get(`/coupons/my?page=${page}&limit=20`)
+    api.get(`/coupons/my?page=${page}&limit=10`)
       .then(({ data }) => {
         setCoupons(data.data.coupons);
         setTotalPages(data.data.pagination.totalPages);

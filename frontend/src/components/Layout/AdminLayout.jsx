@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
-  FiHome, FiPackage, FiGrid, FiShoppingBag, FiUsers,
+  FiHome, FiPackage, FiGrid, FiUsers,
   FiPieChart, FiTrendingUp, FiSettings, FiLogOut,
   FiMenu, FiChevronLeft, FiBell, FiCheck, FiClock,
   FiUserCheck, FiTag, FiImage, FiZap, FiRefreshCw, FiAlertTriangle, FiFileText,
@@ -14,7 +14,6 @@ const sidebarItems = [
   { icon: FiHome, label: 'Dashboard', path: '/admin' },
   { icon: FiPackage, label: 'Sản phẩm', path: '/admin/products' },
   { icon: FiGrid, label: 'Danh mục', path: '/admin/categories' },
-  { icon: FiShoppingBag, label: 'Đơn hàng', path: '/admin/orders' },
   { icon: FiUsers, label: 'Người dùng', path: '/admin/users' },
   { icon: FiUserCheck, label: 'Đối tác', path: '/admin/partners' },
   { icon: FiTag, label: 'Mã giảm giá', path: '/admin/coupons' },
@@ -55,7 +54,7 @@ const AdminLayout = () => {
 
   const handleNotificationClick = async (notif) => {
     if (!notif.isRead) dispatch(markAsRead(notif.id));
-    if (notif.type === 'ORDER' && notif.referenceId) navigate('/admin/orders');
+    if (notif.type === 'ORDER' && notif.referenceId) navigate('/admin');
     setNotifOpen(false);
   };
 

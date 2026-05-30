@@ -16,6 +16,7 @@ const getProducts = asyncHandler(async (req, res) => {
     sort = '-createdAt',
     search,
     inStock,
+    partner,
   } = req.query;
 
   const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -35,6 +36,7 @@ const getProducts = asyncHandler(async (req, res) => {
     ];
   }
   if (inStock === 'true') where.stock = { gt: 0 };
+  if (partner) where.partnerId = partner;
 
   let orderBy = {};
   switch (sort) {
@@ -89,6 +91,7 @@ const getProduct = asyncHandler(async (req, res) => {
     where: { id },
     include: {
       category: { select: { id: true, name: true, slug: true } },
+      partner: { select: { id: true, name: true, storeName: true, storeDescription: true, avatar: true, isApproved: true } },
       reviews: {
         include: {
           user: { select: { id: true, name: true, avatar: true } },
@@ -197,6 +200,7 @@ const getProductBySlug = asyncHandler(async (req, res) => {
     where: { slug },
     include: {
       category: { select: { id: true, name: true } },
+      partner: { select: { id: true, name: true, storeName: true, storeDescription: true, avatar: true, isApproved: true } },
       reviews: {
         include: { user: { select: { id: true, name: true, avatar: true } } },
         orderBy: { createdAt: 'desc' },
@@ -218,6 +222,7 @@ const getFeaturedProducts = asyncHandler(async (req, res) => {
     take: 8,
     include: {
       category: { select: { id: true, name: true } },
+      partner: { select: { id: true, name: true, storeName: true } },
     },
   });
 

@@ -31,7 +31,7 @@ const ProductListPage = () => {
   }, [dispatch]);
 
   useEffect(() => {
-    const params = { page: currentPage, limit: 12, sort: currentSort };
+    const params = { page: currentPage, limit: 10, sort: currentSort };
     if (currentCategory) params.category = currentCategory;
     if (priceRange.min) params.minPrice = priceRange.min;
     if (priceRange.max) params.maxPrice = priceRange.max;

@@ -32,7 +32,7 @@ const PartnerOrdersPage = () => {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page, limit: 20 });
+      const params = new URLSearchParams({ page, limit: 10 });
       if (statusFilter) params.append('status', statusFilter);
       const { data } = await api.get(`/partner/orders?${params}`);
       setOrders(data.data.orders);

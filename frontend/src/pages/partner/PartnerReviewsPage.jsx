@@ -16,7 +16,7 @@ const PartnerReviewsPage = () => {
 
   const fetchReviews = async () => {
     try {
-      const { data } = await api.get(`/reviews/partner?page=${page}&limit=20`);
+      const { data } = await api.get(`/reviews/partner?page=${page}&limit=10`);
       setReviews(data.data.reviews);
       setStats(data.data.stats);
       setTotalPages(data.data.pagination.totalPages);

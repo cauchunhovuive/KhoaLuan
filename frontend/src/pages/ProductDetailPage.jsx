@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { FiShoppingCart, FiStar, FiMinus, FiPlus, FiSend, FiCheckCircle } from 'react-icons/fi';
+import { FiShoppingCart, FiStar, FiMinus, FiPlus, FiSend, FiCheckCircle, FiShoppingBag, FiChevronRight } from 'react-icons/fi';
 import { fetchProductBySlug, clearCurrentProduct } from '../store/productSlice';
 import { addToCart } from '../store/cartSlice';
 import api from '../services/api';
@@ -120,6 +120,34 @@ const ProductDetailPage = () => {
 
           {product.description && (
             <p className="text-ink-secondary leading-relaxed">{product.description}</p>
+          )}
+
+          {/* Shop Info */}
+          {product.partner?.storeName && (
+            <Link
+              to={`/products?partner=${product.partner.id}`}
+              className="flex items-center justify-between p-4 bg-gradient-to-r from-primary-50/80 to-white border border-primary-100 rounded-2xl hover:shadow-premium-sm hover:border-primary-200 transition-all duration-200 group"
+            >
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center flex-shrink-0 ring-1 ring-primary-200">
+                  {product.partner.avatar ? (
+                    <img src={product.partner.avatar} alt={product.partner.storeName} className="w-full h-full object-cover rounded-xl" />
+                  ) : (
+                    <FiShoppingBag className="text-lg text-primary-600" />
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs text-ink-tertiary uppercase tracking-wider">Cửa hàng</p>
+                  <p className="font-semibold text-ink group-hover:text-primary-600 transition-colors">
+                    {product.partner.storeName}
+                  </p>
+                  {product.partner.storeDescription && (
+                    <p className="text-xs text-ink-tertiary mt-0.5 line-clamp-1">{product.partner.storeDescription}</p>
+                  )}
+                </div>
+              </div>
+              <FiChevronRight className="text-primary-400 group-hover:translate-x-0.5 transition-transform" />
+            </Link>
           )}
 
           {/* Price */}

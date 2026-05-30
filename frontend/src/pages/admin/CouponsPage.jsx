@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { FiPlus, FiSearch, FiTag, FiPercent, FiDollarSign, FiCalendar, FiChevronLeft, FiChevronRight, FiToggleLeft, FiToggleRight, FiCopy, FiTrash2 } from 'react-icons/fi';
+import { FiPlus, FiSearch, FiTag, FiPercent, FiDollarSign, FiCalendar, FiToggleLeft, FiToggleRight, FiCopy, FiTrash2 } from 'react-icons/fi';
 import api from '../../services/api';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
+import Pagination from '../../components/common/Pagination';
 import toast from 'react-hot-toast';
 
-const ITEMS_PER_PAGE = 20;
+const ITEMS_PER_PAGE = 10;
 
 const CouponModal = ({ coupon, onClose, onSaved }) => {
   const [form, setForm] = useState({
@@ -354,24 +355,7 @@ const AdminCouponsPage = () => {
           </div>
 
           {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center space-x-2 mt-4">
-              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
-                className="p-2 rounded-xl border border-gray-200 text-ink-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-all">
-                <FiChevronLeft />
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                <button key={p} onClick={() => setPage(p)}
-                  className={`w-9 h-9 rounded-xl text-sm font-medium transition-all ${p === page ? 'bg-primary-600 text-white shadow-premium-sm' : 'border border-gray-200 text-ink-secondary hover:bg-surface-secondary'}`}>
-                  {p}
-                </button>
-              ))}
-              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                className="p-2 rounded-xl border border-gray-200 text-ink-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-all">
-                <FiChevronRight />
-              </button>
-            </div>
-          )}
+          <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
         </>
       )}
 

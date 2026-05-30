@@ -15,7 +15,7 @@ const PartnersManagePage = () => {
   const fetchPartners = async () => {
     setLoading(true);
     try {
-      const params = { page, limit: 20, search };
+      const params = { page, limit: 10, search };
       if (filter === 'approved') params.isApproved = 'true';
       if (filter === 'pending') params.isApproved = 'false';
       const { data } = await api.get('/partner/admin/all', { params });

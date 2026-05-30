@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { FiShoppingCart, FiStar } from 'react-icons/fi';
+import { FiShoppingCart, FiStar, FiShoppingBag } from 'react-icons/fi';
 import { useDispatch } from 'react-redux';
 import toast from 'react-hot-toast';
 import { addToCart } from '../../store/cartSlice';
@@ -78,6 +78,15 @@ const ProductCard = ({ product }) => {
             </span>
           )}
         </div>
+
+        {product.partner?.storeName && (
+          <div className="flex items-center space-x-1 mt-2 pt-2 border-t border-gray-100">
+            <FiShoppingBag className="text-[10px] text-primary-500 flex-shrink-0" />
+            <span className="text-[11px] text-primary-600 font-medium truncate">
+              {product.partner.storeName}
+            </span>
+          </div>
+        )}
       </div>
     </Link>
   );

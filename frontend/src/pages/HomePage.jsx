@@ -5,6 +5,7 @@ import { FiArrowRight, FiTrendingUp, FiUsers, FiShoppingBag, FiAward } from 'rea
 import { fetchFeaturedProducts, fetchCategories } from '../store/productSlice';
 import ProductCard from '../components/common/ProductCard';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import BannerSlider from '../components/common/BannerSlider';
 
 const HomePage = () => {
   const dispatch = useDispatch();
@@ -17,42 +18,8 @@ const HomePage = () => {
 
   return (
     <div>
-      {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-primary-700 via-primary-800 to-primary-900">
-        {/* Background decoration */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-80 h-80 rounded-full bg-primary-500/20 blur-3xl" />
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 rounded-full bg-primary-400/10 blur-3xl" />
-        </div>
-
-        <div className="relative section-container py-24 md:py-36">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center px-3 py-1.5 rounded-full bg-white/10 border border-white/10 text-white/80 text-xs font-medium mb-6 backdrop-blur-sm">
-              <span className="w-1.5 h-1.5 bg-green-400 rounded-full mr-2 animate-pulse-soft" />
-              Hệ thống gợi ý thông minh
-            </div>
-
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-[1.1] tracking-tight mb-6 text-balance">
-              Mua Sắm Thông Minh
-              <span className="block text-primary-200 mt-2">Với Gợi Ý Cá Nhân Hóa</span>
-            </h1>
-
-            <p className="text-lg md:text-xl text-primary-100/80 max-w-2xl mb-10 leading-relaxed">
-              Hệ thống thông minh phân tích sở thích của bạn và gợi ý những sản phẩm phù hợp nhất, mang đến trải nghiệm mua sắm được cá nhân hóa.
-            </p>
-
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Link to="/products" className="inline-flex items-center justify-center px-8 py-3.5 bg-white text-primary-700 rounded-xl font-semibold hover:bg-primary-50 active:scale-[0.98] transition-all duration-200 shadow-premium-lg group">
-                <span>Mua ngay</span>
-                <FiArrowRight className="ml-2 group-hover:translate-x-0.5 transition-transform" />
-              </Link>
-              <Link to="/products?sort=sold" className="inline-flex items-center justify-center px-8 py-3.5 border-2 border-white/20 text-white rounded-xl font-medium hover:bg-white/10 active:scale-[0.98] transition-all duration-200">
-                Bán chạy
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Banner Slider */}
+      <BannerSlider />
 
       {/* Features */}
       <section className="section-padding bg-white">

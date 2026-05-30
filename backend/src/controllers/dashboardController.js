@@ -4,58 +4,31 @@ const asyncHandler = require('../utils/asyncHandler');
 // @desc    Get dashboard stats
 // @route   GET /api/dashboard/stats
 const getStats = asyncHandler(async (req, res) => {
-  const now = new Date();
-  const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const firstDayOfYear = new Date(now.getFullYear(), 0, 1);
-
   const [
     totalUsers,
     totalProducts,
-    totalOrders,
-    totalRevenue,
-    monthlyOrders,
-    monthlyRevenue,
-    yearlyRevenue,
-    recentOrders,
+    totalPartners,
+    totalCategories,
     topProducts,
-    orderStatusStats,
     clusterStats,
   ] = await Promise.all([
     prisma.user.count({ where: { role: 'CUSTOMER' } }),
     prisma.product.count({ where: { isActive: true } }),
-    prisma.order.count(),
-    prisma.order.aggregate({ _sum: { finalAmount: true }, where: { status: 'DELIVERED' } }),
-    prisma.order.count({ where: { createdAt: { gte: firstDayOfMonth } } }),
-    prisma.order.aggregate({
-      _sum: { finalAmount: true },
-      where: { createdAt: { gte: firstDayOfMonth }, status: 'DELIVERED' },
-    }),
-    prisma.order.aggregate({
-      _sum: { finalAmount: true },
-      where: { createdAt: { gte: firstDayOfYear }, status: 'DELIVERED' },
-    }),
-    prisma.order.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: 10,
-      include: {
-        user: { select: { id: true, name: true } },
-        orderItems: { include: { product: { select: { name: true } } }, take: 3 },
-      },
-    }),
+    prisma.user.count({ where: { role: 'PARTNER', isApproved: true } }),
+    prisma.category.count(),
     prisma.product.findMany({
       where: { isActive: true },
       orderBy: { soldCount: 'desc' },
       take: 10,
       select: { id: true, name: true, images: true, price: true, soldCount: true, rating: true, stock: true },
     }),
-    prisma.order.groupBy({
-      by: ['status'],
-      _count: true,
-    }),
     prisma.cluster.findMany({
       include: { _count: { select: { users: true } } },
     }),
   ]);
+
+  // Tính phần trăm phân bố khách hàng trong cluster
+  const totalClusterUsers = clusterStats.reduce((sum, c) => sum + c._count.users, 0) || 1;
 
   res.json({
     success: true,
@@ -63,16 +36,15 @@ const getStats = asyncHandler(async (req, res) => {
       overview: {
         totalUsers,
         totalProducts,
-        totalOrders,
-        totalRevenue: totalRevenue._sum.finalAmount || 0,
-        monthlyOrders,
-        monthlyRevenue: monthlyRevenue._sum.finalAmount || 0,
-        yearlyRevenue: yearlyRevenue._sum.finalAmount || 0,
+        totalPartners,
+        totalCategories,
       },
-      recentOrders,
       topProducts,
-      orderStatusStats: orderStatusStats.map((s) => ({ status: s.status, count: s._count })),
-      clusterStats: clusterStats.map((c) => ({ id: c.id, name: c.name, color: c.color, userCount: c._count.users })),
+      clusterStats: clusterStats.map((c) => ({
+        id: c.id, name: c.name, color: c.color,
+        userCount: c._count.users,
+        percentage: Math.round((c._count.users / totalClusterUsers) * 100),
+      })),
     },
   });
 });

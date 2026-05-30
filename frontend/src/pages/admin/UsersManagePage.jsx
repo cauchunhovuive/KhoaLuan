@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FiSearch, FiUser, FiShoppingBag, FiCheck, FiX, FiShield } from 'react-icons/fi';
+import { FiSearch, FiUser, FiShoppingBag, FiCheck, FiX, FiShield, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import api from '../../services/api';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import toast from 'react-hot-toast';
@@ -23,18 +23,23 @@ const UsersManagePage = () => {
   const [allUsers, setAllUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   const fetchData = async () => {
     setLoading(true);
     try {
+      const params = { page, limit: 10, search };
       const [usersRes, partnersRes, allRes] = await Promise.all([
-        api.get('/users', { params: { limit: 50, role: 'CUSTOMER', search } }),
-        api.get('/partner/admin/all', { params: { limit: 50, search } }),
-        api.get('/users', { params: { limit: 100, search } }),
+        api.get('/users', { params: { ...params, role: 'CUSTOMER' } }),
+        api.get('/partner/admin/all', { params }),
+        api.get('/users', { params: { ...params, limit: 100 } }),
       ]);
       setUsers(usersRes.data.data.users);
       setPartners(partnersRes.data.data.partners);
       setAllUsers(allRes.data.data.users);
+      const pag = usersRes.data.data.pagination;
+      if (pag) setTotalPages(pag.totalPages);
     } catch (err) {
       toast.error('Không thể tải dữ liệu');
     } finally {
@@ -42,7 +47,7 @@ const UsersManagePage = () => {
     }
   };
 
-  useEffect(() => { fetchData(); }, [search]);
+  useEffect(() => { fetchData(); }, [search, page]);
 
   const handleApprove = async (id, approved) => {
     try {
@@ -96,7 +101,7 @@ const UsersManagePage = () => {
         {tabs.map((tab) => (
           <button
             key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => { setActiveTab(tab.key); setPage(1); }}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center space-x-2 ${
               activeTab === tab.key ? 'bg-white text-ink shadow-premium-sm' : 'text-ink-secondary hover:text-ink'
             }`}
@@ -117,7 +122,7 @@ const UsersManagePage = () => {
         <div className="relative max-w-md">
           <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
           <input type="text" placeholder="Tìm kiếm tên, email..." value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             className="w-full pl-11 pr-4 py-2.5 bg-surface-secondary border border-gray-200 rounded-xl text-sm text-ink placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200" />
         </div>
       </div>
@@ -126,7 +131,8 @@ const UsersManagePage = () => {
         <>
           {/* Tất cả / Khách hàng */}
           {activeTab !== 'partners' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 stagger-fade">
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 stagger-fade">
               {displayUsers.length > 0 ? displayUsers.map((user) => (
                 <div key={user.id} className="card p-5 hover:border-gray-200 transition-all duration-200">
                   <div className="flex items-center space-x-3 mb-4">
@@ -176,6 +182,25 @@ const UsersManagePage = () => {
                 </div>
               )}
             </div>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center space-x-2 mt-6">
+                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                  className="p-2 rounded-xl border border-gray-200 text-ink-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-all">
+                  <FiChevronLeft />
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                  <button key={p} onClick={() => setPage(p)}
+                    className={`w-9 h-9 rounded-xl text-sm font-medium transition-all ${p === page ? 'bg-primary-600 text-white shadow-premium-sm' : 'border border-gray-200 text-ink-secondary hover:bg-surface-secondary'}`}>
+                    {p}
+                  </button>
+                ))}
+                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                  className="p-2 rounded-xl border border-gray-200 text-ink-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-all">
+                  <FiChevronRight />
+                </button>
+              </div>
+            )}
+            </>
           )}
 
           {/* Đối tác */}

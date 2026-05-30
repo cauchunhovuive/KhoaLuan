@@ -20,7 +20,7 @@ const ViolationManagementPage = () => {
 
   const fetchViolations = () => {
     setLoading(true);
-    const params = { page, limit: 20 };
+    const params = { page, limit: 10 };
     if (filter) params.status = filter;
     api.get('/violations', { params })
       .then(({ data }) => {

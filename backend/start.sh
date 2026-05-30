@@ -7,7 +7,7 @@ echo "  KhoaLuan Backend - Khởi động..."
 echo "================================================"
 
 # Đợi database sẵn sàng (thử kết nối bằng Node.js)
-echo "[1/3] Đợi PostgreSQL sẵn sàng..."
+echo "[1/5] Đợi PostgreSQL sẵn sàng..."
 for i in $(seq 1 30); do
   node -e "
     const { PrismaClient } = require('@prisma/client');
@@ -22,12 +22,20 @@ done
 echo "  ✔ Database sẵn sàng"
 
 # Push schema lên database
-echo "[2/3] Push schema..."
+echo "[2/5] Push schema..."
 npx prisma db push --accept-data-loss 2>&1 | grep -v "already exists"
 
 # Seed dữ liệu mẫu
-echo "[3/3] Seed dữ liệu mẫu..."
+echo "[3/5] Seed dữ liệu mẫu..."
 node prisma/seed.js
+
+# Seed dữ liệu mở rộng
+echo "[4/5] Seed dữ liệu mở rộng..."
+node prisma/seed-full.js
+
+# Seed flash sale, banner, refund, violation, audit log, conversation
+echo "[5/5] Seed dữ liệu bổ sung..."
+node prisma/seed-new-models.js
 
 echo ""
 echo "================================================"

@@ -17,7 +17,7 @@ const SearchPage = () => {
 
   useEffect(() => {
     if (query) {
-      dispatch(fetchProducts({ search: query, page, limit: 12 }));
+      dispatch(fetchProducts({ search: query, page, limit: 10 }));
     }
   }, [dispatch, query, page]);
 

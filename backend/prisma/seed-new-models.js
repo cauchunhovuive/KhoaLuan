@@ -4,7 +4,14 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Bắt đầu seed dữ liệu cho model mới...\n');
+  console.log('🌱 Seed dữ liệu bổ sung...\n');
+
+  // Kiểm tra idempotent: nếu đã có banner thì bỏ qua
+  const existingBanners = await prisma.banner.count();
+  if (existingBanners > 0) {
+    console.log('  ℹ Dữ liệu bổ sung đã tồn tại, bỏ qua.');
+    return;
+  }
 
   // ─── Lấy người dùng hiện có ───
   const admin = await prisma.user.findUnique({ where: { email: 'admin@khoaluan.com' } });

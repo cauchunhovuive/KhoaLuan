@@ -20,7 +20,7 @@ const PartnerProductsPage = () => {
 
   const fetchProducts = async () => {
     try {
-      const { data } = await api.get(`/partner/products?page=${page}&limit=20`);
+      const { data } = await api.get(`/partner/products?page=${page}&limit=10`);
       setProducts(data.data.products);
       setTotalPages(data.data.pagination.totalPages);
     } catch (err) {

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FiPackage, FiChevronRight, FiShoppingBag } from 'react-icons/fi';
+import { FiPackage, FiChevronRight, FiShoppingBag, FiChevronLeft } from 'react-icons/fi';
 import api from '../services/api';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
@@ -16,14 +16,19 @@ const OrdersPage = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
-    const params = {};
+    setLoading(true);
+    const params = { page, limit: 10 };
     if (filter) params.status = filter;
     api.get('/orders', { params }).then(({ data }) => {
       setOrders(data.data.orders || []);
+      const pag = data.data.pagination;
+      if (pag) setTotalPages(pag.totalPages);
     }).catch(() => {}).finally(() => setLoading(false));
-  }, [filter]);
+  }, [filter, page]);
 
   if (loading) return <LoadingSpinner />;
 
@@ -44,6 +49,25 @@ const OrdersPage = () => {
           </button>
         ))}
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center space-x-2 mb-6">
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+            className="p-2 rounded-xl border border-gray-200 text-ink-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-all">
+            <FiChevronLeft />
+          </button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+            <button key={p} onClick={() => setPage(p)}
+              className={`w-9 h-9 rounded-xl text-sm font-medium transition-all ${p === page ? 'bg-primary-600 text-white shadow-premium-sm' : 'border border-gray-200 text-ink-secondary hover:bg-surface-secondary'}`}>
+              {p}
+            </button>
+          ))}
+          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+            className="p-2 rounded-xl border border-gray-200 text-ink-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-all">
+            <FiChevronRight />
+          </button>
+        </div>
+      )}
 
       {orders.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
