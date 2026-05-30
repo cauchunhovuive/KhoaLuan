@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiChevronLeft, FiChevronRight, FiStar, FiBox } from 'react-icons/fi';
 import api from '../../services/api';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import toast from 'react-hot-toast';
@@ -80,8 +80,10 @@ const ProductsManagePage = () => {
                 <thead>
                   <tr className="bg-surface-secondary text-left">
                     <th className="p-4 font-medium text-ink-tertiary text-xs uppercase tracking-wider">Sản phẩm</th>
+                    <th className="p-4 font-medium text-ink-tertiary text-xs uppercase tracking-wider">Cửa hàng</th>
                     <th className="p-4 font-medium text-ink-tertiary text-xs uppercase tracking-wider">Danh mục</th>
                     <th className="p-4 font-medium text-ink-tertiary text-xs uppercase tracking-wider">Giá</th>
+                    <th className="p-4 font-medium text-ink-tertiary text-xs uppercase tracking-wider">Đánh giá</th>
                     <th className="p-4 font-medium text-ink-tertiary text-xs uppercase tracking-wider">Tồn kho</th>
                     <th className="p-4 font-medium text-ink-tertiary text-xs uppercase tracking-wider">Đã bán</th>
                     <th className="p-4 font-medium text-ink-tertiary text-xs uppercase tracking-wider">Thao tác</th>
@@ -98,8 +100,25 @@ const ProductsManagePage = () => {
                           <span className="font-medium text-ink">{product.name}</span>
                         </div>
                       </td>
+                      <td className="p-4 text-ink-secondary">
+                        {product.partner ? (
+                          <div className="flex items-center space-x-1.5">
+                            <FiBox className="text-emerald-500 text-xs" />
+                            <span className="text-emerald-700 font-medium">{product.partner.storeName || product.partner.name}</span>
+                          </div>
+                        ) : (
+                          <span className="text-ink-tertiary text-xs">—</span>
+                        )}
+                      </td>
                       <td className="p-4 text-ink-secondary">{product.category?.name || <span className="text-ink-tertiary">—</span>}</td>
                       <td className="p-4 font-semibold text-ink">{product.price.toLocaleString('vi-VN')}₫</td>
+                      <td className="p-4">
+                        <div className="flex items-center space-x-1.5">
+                          <FiStar className={`text-xs ${product.rating > 0 ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'}`} />
+                          <span className="font-medium text-ink">{product.rating?.toFixed(1) || '0.0'}</span>
+                          <span className="text-ink-tertiary text-xs">({product.reviewCount || 0})</span>
+                        </div>
+                      </td>
                       <td className="p-4">
                         <span className={`font-medium ${product.stock <= 5 ? 'text-red-600' : 'text-ink'}`}>{product.stock}</span>
                       </td>

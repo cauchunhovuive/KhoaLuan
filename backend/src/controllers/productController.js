@@ -54,6 +54,7 @@ const getProducts = asyncHandler(async (req, res) => {
       take: parseInt(limit),
       include: {
         category: { select: { id: true, name: true, slug: true } },
+        partner: { select: { id: true, name: true, storeName: true } },
       },
     }),
     prisma.product.count({ where }),

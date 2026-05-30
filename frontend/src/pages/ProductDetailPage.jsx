@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { FiShoppingCart, FiStar, FiMinus, FiPlus } from 'react-icons/fi';
+import { FiShoppingCart, FiStar, FiMinus, FiPlus, FiSend, FiCheckCircle } from 'react-icons/fi';
 import { fetchProductBySlug, clearCurrentProduct } from '../store/productSlice';
 import { addToCart } from '../store/cartSlice';
 import api from '../services/api';
@@ -17,6 +17,10 @@ const ProductDetailPage = () => {
   const [currentImage, setCurrentImage] = useState(0);
   const [reviews, setReviews] = useState([]);
   const [reviewStats, setReviewStats] = useState({ averageRating: 0, totalReviews: 0 });
+  const [newRating, setNewRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [newComment, setNewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   useEffect(() => {
     dispatch(clearCurrentProduct());
@@ -24,18 +28,23 @@ const ProductDetailPage = () => {
     return () => dispatch(clearCurrentProduct());
   }, [dispatch, slug]);
 
+  const fetchReviews = useCallback(() => {
+    if (!product) return;
+    api.get(`/reviews/product/${product.id}`).then(({ data }) => {
+      if (data.success) {
+        setReviews(data.data.reviews || []);
+        setReviewStats(data.data.stats || {});
+      }
+    }).catch(() => {});
+  }, [product]);
+
   useEffect(() => {
     if (product) {
       setCurrentImage(0);
       setQuantity(1);
-      api.get(`/reviews/product/${product.id}`).then(({ data }) => {
-        if (data.success) {
-          setReviews(data.data.reviews || []);
-          setReviewStats(data.data.stats || {});
-        }
-      }).catch(() => {});
+      fetchReviews();
     }
-  }, [product]);
+  }, [product, fetchReviews]);
 
   const handleAddToCart = () => {
     if (!product) return;
@@ -166,31 +175,158 @@ const ProductDetailPage = () => {
       <section className="mt-16">
         <div className="flex items-center space-x-3 mb-8">
           <h2 className="text-xl font-bold text-ink">Đánh giá sản phẩm</h2>
-          <span className="text-sm text-ink-tertiary">({reviews.length})</span>
+          <span className="text-sm text-ink-tertiary">({reviewStats.totalReviews || reviews.length})</span>
         </div>
+
+        {/* Review stats summary */}
+        {reviewStats.totalReviews > 0 && (
+          <div className="card p-6 mb-8 flex items-center space-x-8">
+            <div className="text-center">
+              <div className="text-4xl font-bold text-ink">{reviewStats.averageRating?.toFixed(1) || '0.0'}</div>
+              <div className="flex items-center space-x-0.5 mt-1 justify-center">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <FiStar key={star} className={`text-sm ${star <= Math.round(reviewStats.averageRating || 0) ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'}`} />
+                ))}
+              </div>
+              <p className="text-xs text-ink-tertiary mt-1">{reviewStats.totalReviews} đánh giá</p>
+            </div>
+            <div className="flex-1 space-y-1.5">
+              {[5, 4, 3, 2, 1].map((star) => {
+                const count = reviewStats.ratingDistribution?.[star] || 0;
+                const pct = reviewStats.totalReviews > 0 ? (count / reviewStats.totalReviews) * 100 : 0;
+                return (
+                  <div key={star} className="flex items-center space-x-2 text-xs">
+                    <span className="w-8 text-right text-ink-secondary">{star} ★</span>
+                    <div className="flex-1 h-2 bg-surface-tertiary rounded-full overflow-hidden">
+                      <div className="h-full bg-yellow-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="w-8 text-ink-tertiary">{count}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Review submission form */}
+        {isAuthenticated && (
+          <div className="card p-6 mb-8">
+            <h3 className="font-semibold text-ink mb-4">Viết đánh giá của bạn</h3>
+            <div className="flex items-center space-x-1 mb-4">
+              <p className="text-sm text-ink-secondary mr-3">Chất lượng:</p>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  type="button"
+                  onClick={() => setNewRating(star)}
+                  onMouseEnter={() => setHoverRating(star)}
+                  onMouseLeave={() => setHoverRating(0)}
+                  className="p-0.5 transition-transform hover:scale-110 active:scale-90"
+                >
+                  <FiStar
+                    className={`text-xl transition-all duration-150 ${
+                      star <= (hoverRating || newRating)
+                        ? 'text-yellow-500 fill-yellow-500 drop-shadow-sm'
+                        : 'text-gray-300 hover:text-yellow-400'
+                    }`}
+                  />
+                </button>
+              ))}
+              {newRating > 0 && (
+                <span className="ml-2 text-sm font-medium text-ink">
+                  {['', 'Tệ', 'Không hài lòng', 'Bình thường', 'Hài lòng', 'Tuyệt vời'][newRating]}
+                </span>
+              )}
+            </div>
+            <textarea
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              placeholder="Chia sẻ trải nghiệm của bạn về sản phẩm..."
+              rows={3}
+              className="w-full px-4 py-3 bg-surface-secondary border border-gray-200 rounded-xl text-sm text-ink placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200 resize-none"
+            />
+            <div className="flex items-center justify-between mt-4">
+              <p className="text-xs text-ink-tertiary">
+                <FiCheckCircle className="inline mr-1 text-emerald-500" />
+                Bạn cần đã mua và nhận được hàng để đánh giá
+              </p>
+              <button
+                onClick={async () => {
+                  if (newRating === 0) {
+                    toast.error('Vui lòng chọn số sao đánh giá');
+                    return;
+                  }
+                  if (!newComment.trim()) {
+                    toast.error('Vui lòng nhập nội dung đánh giá');
+                    return;
+                  }
+                  setSubmittingReview(true);
+                  try {
+                    await api.post('/reviews', {
+                      productId: product.id,
+                      rating: newRating,
+                      comment: newComment.trim(),
+                    });
+                    toast.success('Đánh giá thành công!');
+                    setNewRating(0);
+                    setNewComment('');
+                    fetchReviews();
+                  } catch (err) {
+                    toast.error(err.response?.data?.message || 'Gửi đánh giá thất bại');
+                  } finally {
+                    setSubmittingReview(false);
+                  }
+                }}
+                disabled={submittingReview}
+                className="btn-primary inline-flex items-center space-x-2 py-2.5"
+              >
+                <FiSend size={14} />
+                <span>{submittingReview ? 'Đang gửi...' : 'Gửi đánh giá'}</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Review list */}
         {reviews.length === 0 ? (
           <div className="text-center py-12 bg-surface-secondary rounded-2xl">
             <FiStar className="mx-auto text-3xl text-gray-300 mb-3" />
-            <p className="text-ink-secondary">Chưa có đánh giá nào</p>
+            <p className="text-ink-secondary">Chưa có đánh giá nào.</p>
+            {!isAuthenticated && (
+              <Link to="/login" className="text-primary-600 text-sm font-medium hover:underline mt-2 inline-block">
+                Đăng nhập để đánh giá sản phẩm
+              </Link>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {reviews.map((review) => (
-              <div key={review.id} className="card p-5">
+              <div key={review.id} className="card p-5 hover:border-gray-200 transition-all">
                 <div className="flex items-center space-x-3 mb-3">
-                  <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center ring-1 ring-primary-100">
+                  <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center ring-1 ring-primary-100 flex-shrink-0">
                     <span className="text-primary-600 font-bold text-sm">{review.user?.name?.[0] || '?'}</span>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-medium text-ink text-sm">{review.user?.name}</p>
-                    <div className="flex items-center space-x-0.5 mt-0.5">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <FiStar key={star} className={`text-xs ${star <= review.rating ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'}`} />
-                      ))}
+                    <div className="flex items-center space-x-2 mt-0.5">
+                      <div className="flex items-center space-x-0.5">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <FiStar key={star} className={`text-xs ${star <= review.rating ? 'text-yellow-500 fill-yellow-500' : 'text-gray-200'}`} />
+                        ))}
+                      </div>
+                      <span className="text-[10px] text-ink-tertiary">
+                        {new Date(review.createdAt).toLocaleDateString('vi-VN')}
+                      </span>
                     </div>
                   </div>
                 </div>
                 {review.comment && <p className="text-ink-secondary text-sm leading-relaxed">{review.comment}</p>}
+                {review.reply && (
+                  <div className="mt-3 pt-3 border-t border-gray-100 pl-4">
+                    <p className="text-xs font-semibold text-emerald-600 mb-1">Phản hồi từ shop:</p>
+                    <p className="text-sm text-ink-secondary">{review.reply}</p>
+                  </div>
+                )}
               </div>
             ))}
           </div>
