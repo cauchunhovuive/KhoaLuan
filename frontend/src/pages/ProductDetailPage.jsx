@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   FiShoppingCart, FiStar, FiMinus, FiPlus, FiSend, FiCheckCircle,
-  FiShoppingBag, FiChevronRight, FiZap, FiTrendingUp, FiClock,
+  FiShoppingBag, FiChevronRight, FiZap, FiClock,
   FiShield, FiTruck, FiRefreshCw,
 } from 'react-icons/fi';
 import { fetchProductBySlug, clearCurrentProduct } from '../store/productSlice';
@@ -69,24 +69,6 @@ const SectionBadge = ({ icon: Icon, label, sublabel, color = 'primary' }) => {
   );
 };
 
-/* ─── ML Score Badge ─── */
-const MLScoreBadge = ({ score }) => {
-  const pct = Math.round(score * 100);
-  return (
-    <div className="flex items-center space-x-1.5">
-      <div className="relative w-14 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-        <div
-          className={`absolute inset-y-0 left-0 rounded-full transition-all duration-1000 ease-out ${
-            pct > 70 ? 'bg-emerald-500' : pct > 40 ? 'bg-amber-500' : 'bg-red-400'
-          }`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <span className="text-[9px] font-semibold text-ink-tertiary">{pct}%</span>
-    </div>
-  );
-};
-
 /* ═══════════════════════════════════════════
    PRODUCT DETAIL PAGE
    ═══════════════════════════════════════════ */
@@ -106,11 +88,7 @@ const ProductDetailPage = () => {
   const [newComment, setNewComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
 
-  // ML Explain
-  const [explainData, setExplainData] = useState(null);
-  const [explainLoading, setExplainLoading] = useState(false);
-
-  // ML Session Recs
+  // Related products (similar)
   const [sessionRecs, setSessionRecs] = useState([]);
   const [sessionRecsLoading, setSessionRecsLoading] = useState(false);
 
@@ -137,19 +115,12 @@ const ProductDetailPage = () => {
     // Log view
     api.post(`/products/${pid}/view`).catch(() => {});
 
-    // Session recs
+    // Load related products — dùng API backend đã cache, nhanh hơn ML trực tiếp
     setSessionRecsLoading(true);
-    api.post('/ml/session/recommend', { sessionItems: [pid], topN: 6 })
+    api.get(`/recommendations/similar/${pid}`)
       .then(({ data }) => setSessionRecs(data.data || []))
       .catch(() => {})
       .finally(() => setSessionRecsLoading(false));
-
-    // Explain recs
-    setExplainLoading(true);
-    api.post('/ml/explain', { userId: 'admin', topN: 5 })
-      .then(({ data }) => setExplainData(data.data || data))
-      .catch(() => {})
-      .finally(() => setExplainLoading(false));
   }, [product]);
 
   useEffect(() => {
@@ -518,71 +489,6 @@ const ProductDetailPage = () => {
                         </div>
                       </div>
                     </Link>
-                  ))}
-                </div>
-              )}
-            </section>
-          </Reveal>
-          </LazySection>
-        )}
-
-        {/* ═══════════════ ML EXPLAIN RECOMMENDATIONS ═══════════════ */}
-        {explainData?.recommendations?.length > 0 && (
-          <LazySection placeholder={<div className="mt-12" />}>
-          <Reveal className="mt-12 md:mt-16" delay={200}>
-            <section>
-              <SectionBadge icon={FiTrendingUp} label="Gợi ý thông minh cho bạn" sublabel="Dựa trên phân tích AI về sở thích của bạn" color="amber" />
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 stagger-fade">
-                {explainData.recommendations.map((rec, idx) => (
-                  <Link
-                    key={idx}
-                    to={`/products/${rec.product_id}`}
-                    className="group card-double-bezel"
-                  >
-                    <div className="card-inner p-0 overflow-hidden rounded-[calc(1.25rem-0.375rem)]">
-                      <div className="aspect-square bg-gradient-to-br from-amber-50 to-orange-50 flex items-center justify-center">
-                        <FiShoppingBag className="text-3xl text-amber-300 group-hover:scale-110 transition-transform duration-500" />
-                      </div>
-                      <div className="p-3.5 space-y-2">
-                        <p className="text-xs font-medium text-ink truncate group-hover:text-primary-600 transition-colors">
-                          {rec.product_name || rec.product_id}
-                        </p>
-                        {rec.score && (
-                          <div className="flex items-center justify-between">
-                            <span className="text-[9px] text-ink-tertiary font-medium">Độ phù hợp</span>
-                            <MLScoreBadge score={rec.score} />
-                          </div>
-                        )}
-                        {rec.reason && (
-                          <p className="text-[9px] text-ink-tertiary leading-relaxed line-clamp-2 italic">
-                            "{rec.reason}"
-                          </p>
-                        )}
-                        {rec.reason_type && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-amber-50 border border-amber-100 text-[7px] font-semibold text-amber-600 uppercase tracking-wider">
-                            {rec.reason_type}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-
-              {/* Weights */}
-              {explainData.weights && (
-                <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 text-[10px] text-ink-tertiary bg-surface-secondary rounded-2xl px-5 py-3 border border-gray-100">
-                  <FiZap className="text-primary-500 text-xs" />
-                  <span>Trọng số gợi ý:</span>
-                  {Object.entries(explainData.weights).map(([key, val]) => (
-                    <span key={key} className="flex items-center space-x-1.5">
-                      <span className="capitalize">{key.replace(/_/g, ' ')}</span>
-                      <div className="w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                        <div className="h-full bg-primary-500 rounded-full" style={{ width: `${val * 100}%` }} />
-                      </div>
-                      <span className="font-medium">{(val * 100).toFixed(0)}%</span>
-                    </span>
                   ))}
                 </div>
               )}

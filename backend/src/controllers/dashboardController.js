@@ -1,10 +1,15 @@
 const { prisma } = require('../config/database');
+const { cacheGet, cacheSet } = require('../config/redis');
 const asyncHandler = require('../utils/asyncHandler');
 const mlService = require('../services/mlService');
 
-// @desc    Get dashboard stats
+// @desc    Get dashboard stats (cached 5 phút)
 // @route   GET /api/dashboard/stats
 const getStats = asyncHandler(async (req, res) => {
+  const cacheKey = 'dash:stats';
+  const cached = await cacheGet(cacheKey);
+  if (cached) return res.json({ success: true, data: cached });
+
   const [
     totalUsers,
     totalProducts,
@@ -33,32 +38,36 @@ const getStats = asyncHandler(async (req, res) => {
   // Tính phần trăm phân bố khách hàng trong cluster
   const totalClusterUsers = clusterStats.reduce((sum, c) => sum + c._count.users, 0) || 1;
 
-  res.json({
-    success: true,
-    data: {
-      overview: {
-        totalUsers,
-        totalProducts,
-        totalPartners,
-        totalCategories,
-      },
-      topProducts,
-      clusterStats: clusterStats.map((c) => ({
-        id: c.id, name: c.name, color: c.color,
-        userCount: c._count.users,
-        percentage: Math.round((c._count.users / totalClusterUsers) * 100),
-      })),
-      mlService: {
-        healthy: mlHealth,
-      },
+  const data = {
+    overview: {
+      totalUsers,
+      totalProducts,
+      totalPartners,
+      totalCategories,
     },
-  });
+    topProducts,
+    clusterStats: clusterStats.map((c) => ({
+      id: c.id, name: c.name, color: c.color,
+      userCount: c._count.users,
+      percentage: Math.round((c._count.users / totalClusterUsers) * 100),
+    })),
+    mlService: {
+      healthy: mlHealth,
+    },
+  };
+
+  await cacheSet(cacheKey, data, 300); // 5 phút
+  res.json({ success: true, data });
 });
 
-// @desc    Get sales chart data (monthly revenue & orders)
+// @desc    Get sales chart data (cached 5 phút)
 // @route   GET /api/dashboard/sales-chart
 const getSalesChart = asyncHandler(async (req, res) => {
   const { days = 30 } = req.query;
+  const cacheKey = `dash:sales:${days}`;
+  const cached = await cacheGet(cacheKey);
+  if (cached) return res.json({ success: true, data: cached });
+
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - parseInt(days));
 
@@ -82,13 +91,18 @@ const getSalesChart = asyncHandler(async (req, res) => {
     dailyData[dateKey].orders += 1;
   }
 
-  res.json({ success: true, data: Object.values(dailyData) });
+  const data = Object.values(dailyData);
+  await cacheSet(cacheKey, data, 300); // 5 phút
+  res.json({ success: true, data });
 });
 
-// @desc    Get monthly revenue & orders for the year
+// @desc    Get monthly revenue & orders for the year (cached 10 phút)
 // @route   GET /api/dashboard/monthly-chart
 const getMonthlyChart = asyncHandler(async (req, res) => {
   const year = parseInt(req.query.year) || new Date().getFullYear();
+  const cacheKey = `dash:monthly:${year}`;
+  const cached = await cacheGet(cacheKey);
+  if (cached) return res.json({ success: true, data: cached });
 
   const orders = await prisma.order.findMany({
     where: {
@@ -119,12 +133,17 @@ const getMonthlyChart = asyncHandler(async (req, res) => {
     }
   }
 
+  await cacheSet(cacheKey, monthlyData, 600); // 10 phút
   res.json({ success: true, data: monthlyData });
 });
 
-// @desc    Get products by category distribution
+// @desc    Get products by category distribution (cached 10 phút)
 // @route   GET /api/dashboard/category-chart
 const getCategoryChart = asyncHandler(async (req, res) => {
+  const cacheKey = 'dash:category';
+  const cached = await cacheGet(cacheKey);
+  if (cached) return res.json({ success: true, data: cached });
+
   const categories = await prisma.category.findMany({
     include: {
       _count: { select: { products: { where: { isActive: true } } } },
@@ -140,21 +159,25 @@ const getCategoryChart = asyncHandler(async (req, res) => {
     '#84cc16', '#06b6d4', '#d946ef', '#8b5cf6', '#22c55e',
   ];
 
-  res.json({
-    success: true,
-    data: categories.map((c, i) => ({
-      id: c.id,
-      name: c.name,
-      count: c._count.products,
-      percentage: Math.round((c._count.products / total) * 100),
-      color: colors[i % colors.length],
-    })).filter((c) => c.count > 0),
-  });
+  const data = categories.map((c, i) => ({
+    id: c.id,
+    name: c.name,
+    count: c._count.products,
+    percentage: Math.round((c._count.products / total) * 100),
+    color: colors[i % colors.length],
+  })).filter((c) => c.count > 0);
+
+  await cacheSet(cacheKey, data, 600); // 10 phút
+  res.json({ success: true, data });
 });
 
-// @desc    Get order status distribution
+// @desc    Get order status distribution (cached 5 phút)
 // @route   GET /api/dashboard/order-status-chart
 const getOrderStatusChart = asyncHandler(async (req, res) => {
+  const cacheKey = 'dash:orderStatus';
+  const cached = await cacheGet(cacheKey);
+  if (cached) return res.json({ success: true, data: cached });
+
   const statuses = await prisma.order.groupBy({
     by: ['status'],
     _count: true,
@@ -178,13 +201,17 @@ const getOrderStatusChart = asyncHandler(async (req, res) => {
     color: labels[s.status]?.color || '#6b7280',
   }));
 
+  await cacheSet(cacheKey, data, 300); // 5 phút
   res.json({ success: true, data });
 });
 
-// @desc    Get user growth (monthly new users)
+// @desc    Get user growth (monthly new users, cached 10 phút)
 // @route   GET /api/dashboard/user-growth
 const getUserGrowth = asyncHandler(async (req, res) => {
   const year = parseInt(req.query.year) || new Date().getFullYear();
+  const cacheKey = `dash:userGrowth:${year}`;
+  const cached = await cacheGet(cacheKey);
+  if (cached) return res.json({ success: true, data: cached });
 
   const users = await prisma.user.findMany({
     where: {
@@ -213,6 +240,7 @@ const getUserGrowth = asyncHandler(async (req, res) => {
     }
   }
 
+  await cacheSet(cacheKey, monthlyData, 600); // 10 phút
   res.json({ success: true, data: monthlyData });
 });
 

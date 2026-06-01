@@ -63,6 +63,14 @@ services:
       - ./backend/ml:/app
     networks:
       - khoaluan-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
 
   frontend:
     build:

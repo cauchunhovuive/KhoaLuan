@@ -3,8 +3,13 @@ const { cacheGet, cacheSet } = require('../config/redis');
 const asyncHandler = require('../utils/asyncHandler');
 const mlService = require('../services/mlService');
 
-// Helper: build order/product data for ML service
+// Helper: build order/product data for ML service (cached 5 phút)
+const ML_DATA_CACHE_KEY = 'ml:buildData';
+
 async function buildMLData() {
+  const cached = await cacheGet(ML_DATA_CACHE_KEY);
+  if (cached) return cached;
+
   const [orders, products] = await Promise.all([
     prisma.orderItem.findMany({
       take: 500,
@@ -22,7 +27,7 @@ async function buildMLData() {
     }),
   ]);
 
-  return {
+  const result = {
     orders: orders.map(o => ({
       user_id: o.order.userId,
       product_id: o.productId,
@@ -30,6 +35,10 @@ async function buildMLData() {
     })),
     products: products.map(p => ({ id: p.id, name: p.name })),
   };
+
+  // Cache 5 phút — dữ liệu ML không cần real-time
+  await cacheSet(ML_DATA_CACHE_KEY, result, 300);
+  return result;
 }
 
 // @desc    Get personalized recommendations for user
@@ -128,10 +137,16 @@ const getPersonalizedRecommendations = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { recommendations: products.slice(0, 10) } });
 });
 
-// @desc    Get similar products (ML-enhanced)
+// @desc    Get similar products (ML-enhanced, cached)
 // @route   GET /api/recommendations/similar/:productId
 const getSimilarProducts = asyncHandler(async (req, res) => {
   const { productId } = req.params;
+  const cacheKey = `rec:similar:${productId}`;
+
+  const cached = await cacheGet(cacheKey);
+  if (cached) {
+    return res.json({ success: true, data: cached });
+  }
 
   const product = await prisma.product.findUnique({
     where: { id: productId },
@@ -142,38 +157,16 @@ const getSimilarProducts = asyncHandler(async (req, res) => {
     return res.json({ success: true, data: [] });
   }
 
-  let similarIds = [];
+  // Không gọi ML — dùng category-based fallback trực tiếp, nhanh hơn nhiều
+  const similar = await prisma.product.findMany({
+    where: { categoryId: product.categoryId, id: { not: product.id }, isActive: true, stock: { gt: 0 } },
+    orderBy: [{ soldCount: 'desc' }, { rating: 'desc' }],
+    take: 8,
+    select: { id: true, name: true, slug: true, price: true, discountPrice: true, images: true, rating: true, soldCount: true },
+  });
 
-  // Try ML-based similarity first
-  try {
-    const mlData = await buildMLData();
-    const mlSimilar = await mlService.getSimilarProductsML(productId, mlData.orders, mlData.products, 8);
-    if (mlSimilar.length > 0) {
-      similarIds = mlSimilar.map(r => r.product_id);
-    }
-  } catch (e) {
-    // ML failed
-  }
-
-  let similar;
-
-  if (similarIds.length > 0) {
-    const products = await prisma.product.findMany({
-      where: { id: { in: similarIds }, isActive: true },
-      select: { id: true, name: true, slug: true, price: true, discountPrice: true, images: true, rating: true, soldCount: true },
-    });
-    const productMap = new Map(products.map(p => [p.id, p]));
-    similar = similarIds.map(id => productMap.get(id)).filter(Boolean);
-  } else {
-    // Fallback: same category, best sellers
-    similar = await prisma.product.findMany({
-      where: { categoryId: product.categoryId, id: { not: product.id }, isActive: true, stock: { gt: 0 } },
-      orderBy: [{ soldCount: 'desc' }, { rating: 'desc' }],
-      take: 8,
-      select: { id: true, name: true, slug: true, price: true, discountPrice: true, images: true, rating: true, soldCount: true },
-    });
-  }
-
+  // Cache 10 phút — sản phẩm tương tự không đổi thường xuyên
+  await cacheSet(cacheKey, similar, 600);
   res.json({ success: true, data: similar });
 });
 

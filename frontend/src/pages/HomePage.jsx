@@ -138,7 +138,7 @@ const HomePage = () => {
   // Fetch trending products from ML
   useEffect(() => {
     setTrendingLoading(true);
-    api.get('/ml/trending')
+    api.get('/recommendations/trending')
       .then(({ data }) => setTrendingProducts(data.data?.products || data.data?.slice?.(0, 8) || []))
       .catch(() => {})
       .finally(() => setTrendingLoading(false));

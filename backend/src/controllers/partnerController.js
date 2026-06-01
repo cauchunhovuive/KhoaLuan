@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { prisma } = require('../config/database');
-const { cacheDel } = require('../config/redis');
+const { cacheGet, cacheSet, cacheDel } = require('../config/redis');
 const AppError = require('../utils/AppError');
 const asyncHandler = require('../utils/asyncHandler');
 
@@ -86,10 +86,13 @@ const registerPartner = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Get partner dashboard stats
+// @desc    Get partner dashboard stats (cached 2 phút)
 // @route   GET /api/partner/dashboard
 const getPartnerDashboard = asyncHandler(async (req, res) => {
   const userId = req.user.id;
+  const cacheKey = `partner:dash:${userId}`;
+  const cached = await cacheGet(cacheKey);
+  if (cached) return res.json({ success: true, data: cached });
 
   const [totalProducts, totalOrders, totalRevenue, activeProducts, recentOrders] = await Promise.all([
     prisma.product.count({ where: { partnerId: userId } }),
@@ -117,18 +120,18 @@ const getPartnerDashboard = asyncHandler(async (req, res) => {
     }),
   ]);
 
-  res.json({
-    success: true,
-    data: {
-      overview: {
-        totalProducts,
-        totalOrders,
-        totalRevenue: totalRevenue._sum.price || 0,
-        activeProducts,
-      },
-      recentOrders,
+  const data = {
+    overview: {
+      totalProducts,
+      totalOrders,
+      totalRevenue: totalRevenue._sum.price || 0,
+      activeProducts,
     },
-  });
+    recentOrders,
+  };
+
+  await cacheSet(cacheKey, data, 120); // 2 phút
+  res.json({ success: true, data });
 });
 
 // @desc    Get partner's products
@@ -466,11 +469,14 @@ const updatePartnerProfile = asyncHandler(async (req, res) => {
   res.json({ success: true, data: user });
 });
 
-// @desc    Get partner revenue data for charts
+// @desc    Get partner revenue data for charts (cached 5 phút)
 // @route   GET /api/partner/revenue
 const getPartnerRevenue = asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const { period = 'monthly', year = new Date().getFullYear() } = req.query;
+  const cacheKey = `partner:revenue:${userId}:${year}`;
+  const cached = await cacheGet(cacheKey);
+  if (cached) return res.json({ success: true, data: cached });
 
   const orders = await prisma.order.findMany({
     where: {
@@ -522,17 +528,17 @@ const getPartnerRevenue = asyncHandler(async (req, res) => {
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 10);
 
-  res.json({
-    success: true,
-    data: {
-      monthlyRevenue: monthlyData.filter((m) => m.orders > 0),
-      topProducts,
-      totalRevenue: orders.reduce(
-        (sum, o) => sum + o.orderItems.reduce((s, i) => s + i.price * i.quantity, 0), 0
-      ),
-      totalOrders: orders.length,
-    },
-  });
+  const data = {
+    monthlyRevenue: monthlyData.filter((m) => m.orders > 0),
+    topProducts,
+    totalRevenue: orders.reduce(
+      (sum, o) => sum + o.orderItems.reduce((s, i) => s + i.price * i.quantity, 0), 0
+    ),
+    totalOrders: orders.length,
+  };
+
+  await cacheSet(cacheKey, data, 300); // 5 phút
+  res.json({ success: true, data });
 });
 
 module.exports = {
