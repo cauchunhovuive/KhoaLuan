@@ -46,7 +46,9 @@ const FollowedShopsPage = () => {
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h3 className="font-semibold text-ink">{s.partner?.storeName || s.partner?.name}</h3>
+                  <Link to={`/shop/${s.partner.id}`} className="hover:text-primary-600 transition-colors">
+                    <h3 className="font-semibold text-ink">{s.partner?.storeName || s.partner?.name}</h3>
+                  </Link>
                   {s.partner?.storeDescription && (
                     <p className="text-sm text-ink-tertiary mt-0.5 line-clamp-2">{s.partner.storeDescription}</p>
                   )}

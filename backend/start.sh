@@ -30,12 +30,16 @@ echo "[3/5] Seed dữ liệu mẫu..."
 node prisma/seed.js
 
 # Seed dữ liệu mở rộng
-echo "[4/5] Seed dữ liệu mở rộng..."
+echo "[4/6] Seed dữ liệu mở rộng..."
 node prisma/seed-full.js
 
 # Seed flash sale, banner, refund, violation, audit log, conversation
-echo "[5/5] Seed dữ liệu bổ sung..."
+echo "[5/6] Seed dữ liệu bổ sung..."
 node prisma/seed-new-models.js
+
+# Seed ML test data (product views, order patterns, recommendations)
+echo "[6/6] Seed dữ liệu ML Test..."
+node prisma/seed-ml-test.js
 
 echo ""
 echo "================================================"

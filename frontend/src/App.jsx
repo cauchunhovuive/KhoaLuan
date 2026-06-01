@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchCurrentUser } from './store/authSlice';
@@ -22,33 +22,38 @@ import WishlistPage from './pages/WishlistPage';
 import AddressManagementPage from './pages/AddressManagementPage';
 import UserChatPage from './pages/UserChatPage';
 import FollowedShopsPage from './pages/FollowedShopsPage';
+import ShopPage from './pages/ShopPage';
 
-// Admin pages
-import DashboardPage from './pages/admin/DashboardPage';
-import ProductsManagePage from './pages/admin/ProductsManagePage';
-import CategoriesManagePage from './pages/admin/CategoriesManagePage';
-import OrdersManagePage from './pages/admin/OrdersManagePage';
-import UsersManagePage from './pages/admin/UsersManagePage';
-import ClustersPage from './pages/admin/ClustersPage';
-import RecommendationsPage from './pages/admin/RecommendationsPage';
-import SettingsPage from './pages/admin/SettingsPage';
-import PartnersManagePage from './pages/admin/PartnersManagePage';
-import CouponsPage from './pages/admin/CouponsPage';
-import BannerManagementPage from './pages/admin/BannerManagementPage';
-import FlashSaleManagementPage from './pages/admin/FlashSaleManagementPage';
-import RefundManagementPage from './pages/admin/RefundManagementPage';
-import ViolationManagementPage from './pages/admin/ViolationManagementPage';
-import AuditLogPage from './pages/admin/AuditLogPage';
-
-// Partner pages
+// Partner Layout (needed at module level)
 import PartnerLayout from './components/Layout/PartnerLayout';
-import PartnerDashboardPage from './pages/partner/PartnerDashboardPage';
-import PartnerProductsPage from './pages/partner/PartnerProductsPage';
-import PartnerOrdersPage from './pages/partner/PartnerOrdersPage';
-import PartnerReviewsPage from './pages/partner/PartnerReviewsPage';
-import PartnerCouponsPage from './pages/partner/PartnerCouponsPage';
-import PartnerProfilePage from './pages/partner/PartnerProfilePage';
-import PartnerChatPage from './pages/partner/PartnerChatPage';
+
+// Lazy-loaded admin pages (split into separate chunks)
+const DashboardPage = React.lazy(() => import('./pages/admin/DashboardPage'));
+const ProductsManagePage = React.lazy(() => import('./pages/admin/ProductsManagePage'));
+const CategoriesManagePage = React.lazy(() => import('./pages/admin/CategoriesManagePage'));
+const OrdersManagePage = React.lazy(() => import('./pages/admin/OrdersManagePage'));
+const UsersManagePage = React.lazy(() => import('./pages/admin/UsersManagePage'));
+const ClustersPage = React.lazy(() => import('./pages/admin/ClustersPage'));
+const RecommendationsPage = React.lazy(() => import('./pages/admin/RecommendationsPage'));
+const SettingsPage = React.lazy(() => import('./pages/admin/SettingsPage'));
+const PartnersManagePage = React.lazy(() => import('./pages/admin/PartnersManagePage'));
+const CouponsPage = React.lazy(() => import('./pages/admin/CouponsPage'));
+const BannerManagementPage = React.lazy(() => import('./pages/admin/BannerManagementPage'));
+const FlashSaleManagementPage = React.lazy(() => import('./pages/admin/FlashSaleManagementPage'));
+const RefundManagementPage = React.lazy(() => import('./pages/admin/RefundManagementPage'));
+const ViolationManagementPage = React.lazy(() => import('./pages/admin/ViolationManagementPage'));
+const AuditLogPage = React.lazy(() => import('./pages/admin/AuditLogPage'));
+const ABTestingPage = React.lazy(() => import('./pages/admin/ABTestingPage'));
+const MLTestPage = React.lazy(() => import('./pages/admin/MLTestPage'));
+
+// Lazy-loaded partner pages
+const PartnerDashboardPage = React.lazy(() => import('./pages/partner/PartnerDashboardPage'));
+const PartnerProductsPage = React.lazy(() => import('./pages/partner/PartnerProductsPage'));
+const PartnerOrdersPage = React.lazy(() => import('./pages/partner/PartnerOrdersPage'));
+const PartnerReviewsPage = React.lazy(() => import('./pages/partner/PartnerReviewsPage'));
+const PartnerCouponsPage = React.lazy(() => import('./pages/partner/PartnerCouponsPage'));
+const PartnerProfilePage = React.lazy(() => import('./pages/partner/PartnerProfilePage'));
+const PartnerChatPage = React.lazy(() => import('./pages/partner/PartnerChatPage'));
 
 const ProtectedRoute = ({ children, adminOnly = false }) => {
   const { isAuthenticated, user } = useSelector((state) => state.auth);
@@ -58,6 +63,15 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
 
   return children;
 };
+
+const RouteFallback = () => (
+  <div className="flex items-center justify-center min-h-[60vh]">
+    <div className="flex flex-col items-center space-y-3">
+      <div className="w-8 h-8 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+      <span className="text-xs text-ink-tertiary animate-pulse-soft">Đang tải...</span>
+    </div>
+  </div>
+);
 
 const PartnerRoute = ({ children }) => {
   const { isAuthenticated, user } = useSelector((state) => state.auth);
@@ -114,44 +128,47 @@ function App() {
         <Route path="followed-shops" element={
           <ProtectedRoute><FollowedShopsPage /></ProtectedRoute>
         } />
+        <Route path="shop/:partnerId" element={<ShopPage />} />
       </Route>
 
       {/* Auth routes */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
 
-      {/* Partner routes */}
+      {/* Partner routes (lazy loaded) */}
       <Route path="/partner" element={
         <PartnerRoute><PartnerLayout /></PartnerRoute>
       }>
-        <Route index element={<PartnerDashboardPage />} />
-        <Route path="products" element={<PartnerProductsPage />} />
-        <Route path="orders" element={<PartnerOrdersPage />} />
-        <Route path="reviews" element={<PartnerReviewsPage />} />
-        <Route path="coupons" element={<PartnerCouponsPage />} />
-        <Route path="chat" element={<PartnerChatPage />} />
-        <Route path="profile" element={<PartnerProfilePage />} />
+        <Route index element={<Suspense fallback={<RouteFallback />}><PartnerDashboardPage /></Suspense>} />
+        <Route path="products" element={<Suspense fallback={<RouteFallback />}><PartnerProductsPage /></Suspense>} />
+        <Route path="orders" element={<Suspense fallback={<RouteFallback />}><PartnerOrdersPage /></Suspense>} />
+        <Route path="reviews" element={<Suspense fallback={<RouteFallback />}><PartnerReviewsPage /></Suspense>} />
+        <Route path="coupons" element={<Suspense fallback={<RouteFallback />}><PartnerCouponsPage /></Suspense>} />
+        <Route path="chat" element={<Suspense fallback={<RouteFallback />}><PartnerChatPage /></Suspense>} />
+        <Route path="profile" element={<Suspense fallback={<RouteFallback />}><PartnerProfilePage /></Suspense>} />
       </Route>
 
-      {/* Admin routes */}
+      {/* Admin routes (lazy loaded) */}
       <Route path="/admin" element={
         <ProtectedRoute adminOnly><AdminLayout /></ProtectedRoute>
       }>
-        <Route index element={<DashboardPage />} />
-        <Route path="products" element={<ProductsManagePage />} />
-        <Route path="categories" element={<CategoriesManagePage />} />
-        <Route path="orders" element={<OrdersManagePage />} />
-        <Route path="users" element={<UsersManagePage />} />
-        <Route path="partners" element={<PartnersManagePage />} />
-        <Route path="coupons" element={<CouponsPage />} />
-        <Route path="banners" element={<BannerManagementPage />} />
-        <Route path="flash-sales" element={<FlashSaleManagementPage />} />
-        <Route path="refunds" element={<RefundManagementPage />} />
-        <Route path="violations" element={<ViolationManagementPage />} />
-        <Route path="audit" element={<AuditLogPage />} />
-        <Route path="clusters" element={<ClustersPage />} />
-        <Route path="recommendations" element={<RecommendationsPage />} />
-        <Route path="settings" element={<SettingsPage />} />
+        <Route index element={<Suspense fallback={<RouteFallback />}><DashboardPage /></Suspense>} />
+        <Route path="products" element={<Suspense fallback={<RouteFallback />}><ProductsManagePage /></Suspense>} />
+        <Route path="categories" element={<Suspense fallback={<RouteFallback />}><CategoriesManagePage /></Suspense>} />
+        <Route path="orders" element={<Suspense fallback={<RouteFallback />}><OrdersManagePage /></Suspense>} />
+        <Route path="users" element={<Suspense fallback={<RouteFallback />}><UsersManagePage /></Suspense>} />
+        <Route path="partners" element={<Suspense fallback={<RouteFallback />}><PartnersManagePage /></Suspense>} />
+        <Route path="coupons" element={<Suspense fallback={<RouteFallback />}><CouponsPage /></Suspense>} />
+        <Route path="banners" element={<Suspense fallback={<RouteFallback />}><BannerManagementPage /></Suspense>} />
+        <Route path="flash-sales" element={<Suspense fallback={<RouteFallback />}><FlashSaleManagementPage /></Suspense>} />
+        <Route path="refunds" element={<Suspense fallback={<RouteFallback />}><RefundManagementPage /></Suspense>} />
+        <Route path="violations" element={<Suspense fallback={<RouteFallback />}><ViolationManagementPage /></Suspense>} />
+        <Route path="audit" element={<Suspense fallback={<RouteFallback />}><AuditLogPage /></Suspense>} />
+        <Route path="clusters" element={<Suspense fallback={<RouteFallback />}><ClustersPage /></Suspense>} />
+        <Route path="recommendations" element={<Suspense fallback={<RouteFallback />}><RecommendationsPage /></Suspense>} />
+        <Route path="abtest" element={<Suspense fallback={<RouteFallback />}><ABTestingPage /></Suspense>} />
+        <Route path="ml-test" element={<Suspense fallback={<RouteFallback />}><MLTestPage /></Suspense>} />
+        <Route path="settings" element={<Suspense fallback={<RouteFallback />}><SettingsPage /></Suspense>} />
       </Route>
     </Routes>
   );

@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { FiPlus, FiEdit2, FiTrash2 } from 'react-icons/fi';
+import { useNavigate } from 'react-router-dom';
+import { FiPlus, FiEdit2, FiTrash2, FiExternalLink } from 'react-icons/fi';
 import api from '../../services/api';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import toast from 'react-hot-toast';
 
 const CategoriesManagePage = () => {
+  const navigate = useNavigate();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -107,10 +109,19 @@ const CategoriesManagePage = () => {
                   <button onClick={() => handleEdit(cat)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"><FiEdit2 size={14} /></button>
                   <button onClick={() => handleDelete(cat.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-xl transition-colors"><FiTrash2 size={14} /></button>
                 </div>
-              </div>
-              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                <span className="text-xs text-ink-tertiary">{cat._count?.products || 0} sản phẩm</span>
-              </div>
+              </div>                  <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                    <span className="text-xs text-ink-tertiary">{cat._count?.products || 0} sản phẩm</span>
+                    {cat._count?.products > 0 && (
+                      <button
+                        onClick={() => navigate('/admin/products', { state: { filterCategory: cat.id, filterCategoryName: cat.name } })}
+                        className="text-xs font-medium text-primary-600 hover:text-primary-700 flex items-center space-x-1 transition-colors"
+                        title="Xem sản phẩm trong danh mục này"
+                      >
+                        <FiExternalLink size={12} />
+                        <span>Xem SP</span>
+                      </button>
+                    )}
+                  </div>
             </div>
           ))}
         </div>

@@ -213,6 +213,26 @@ const getProductBySlug = asyncHandler(async (req, res) => {
   res.json({ success: true, data: product });
 });
 
+// @desc    Log product view (for session-based recommendations)
+// @route   POST /api/products/:id/view
+const logProductView = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  // Check product exists
+  const product = await prisma.product.findUnique({ where: { id }, select: { id: true } });
+  if (!product) throw new AppError('Sản phẩm không tồn tại', 404);
+
+  // Log view (userId is optional - public users can view too)
+  await prisma.productView.create({
+    data: {
+      userId: req.user?.id || 'anonymous',
+      productId: id,
+    },
+  });
+
+  res.json({ success: true });
+});
+
 // @desc    Get featured products
 // @route   GET /api/products/featured
 const getFeaturedProducts = asyncHandler(async (req, res) => {
@@ -237,4 +257,5 @@ module.exports = {
   deleteProduct,
   getProductBySlug,
   getFeaturedProducts,
+  logProductView,
 };

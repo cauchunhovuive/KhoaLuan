@@ -1,22 +1,44 @@
 """
-FastAPI ML Service - Clustering & Recommendation API
+FastAPI ML Service - AI Recommendation Engine
+Clustering + Collaborative Filtering + Session-based + Evaluation
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 import uvicorn
 import logging
+import numpy as np
+import sys
+import os
+
 from .clustering_service import ClusteringPipeline, ClusterProfile
+# Add ml/ directory to path for sibling module access
+_ML_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _ML_DIR not in sys.path:
+    sys.path.insert(0, _ML_DIR)
+
+from collaborative.collaborative_filtering import (
+    ItemItemCF, UserUserCF, ALSMatrixFactorization, HybridRecommender,
+    CFConfig, build_user_product_matrix,
+)
+from session.session_recommender import (
+    SessionRecommender, CoOccurrenceMatrix, SequenceBasedRecommender,
+    SessionConfig, build_sessions_from_views,
+)
+from evaluation.metrics import (
+    RecommendationMetrics, ABTestFramework, EvaluationResult,
+    train_test_split_by_time, build_relevant_set,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="KhoaLuan ML Service",
+    title="KhoaLuan AI Engine",
     description="Customer Clustering & Product Recommendation API",
-    version="1.0.0",
+    version="2.0.0",
 )
 
 app.add_middleware(
@@ -27,11 +49,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Data models
+# ============================================================
+# Pydantic Models
+# ============================================================
+
 class OrderData(BaseModel):
     user_id: str
     total_amount: float
     created_at: str
+
+class OrderItemData(BaseModel):
+    user_id: str
+    product_id: str
+    quantity: int = 1
+    created_at: Optional[str] = None
 
 class ProductData(BaseModel):
     id: str
@@ -39,6 +70,18 @@ class ProductData(BaseModel):
     category_id: str
     price: float
 
+class ProductBrief(BaseModel):
+    id: str
+    name: Optional[str] = ""
+
+class UserProductInteraction(BaseModel):
+    user_id: str
+    product_id: str
+    action: str = "purchase"  # purchase, view, add_to_cart
+    quantity: int = 1
+    created_at: Optional[str] = None
+
+# --- Clustering Models ---
 class ClusterRequest(BaseModel):
     orders: List[OrderData]
     n_clusters: Optional[int] = 4
@@ -49,14 +92,74 @@ class RecommendRequest(BaseModel):
     orders: List[OrderData]
     top_n: Optional[int] = 10
 
+# --- CF Models ---
+class CFRequest(BaseModel):
+    orders: List[OrderItemData]
+    products: List[ProductBrief]
+    config: Optional[Dict[str, Any]] = None
+
+class CFRecommendRequest(BaseModel):
+    user_id: str
+    orders: List[OrderItemData]
+    products: List[ProductBrief]
+    top_n: Optional[int] = 10
+    strategy: Optional[str] = "hybrid"  # hybrid, item_cf, user_cf, als
+
+class SimilarProductsRequest(BaseModel):
+    product_id: str
+    orders: List[OrderItemData]
+    products: List[ProductBrief]
+    top_n: Optional[int] = 10
+
+# --- Session Models ---
+class SessionViewLog(BaseModel):
+    user_id: str
+    product_id: str
+    timestamp: str
+
+class SessionRecommendRequest(BaseModel):
+    session_items: List[str]
+    view_logs: Optional[List[SessionViewLog]] = None
+    products: List[ProductBrief]
+    top_n: Optional[int] = 10
+    strategy: Optional[str] = "hybrid"  # hybrid, cooccurrence, sequence, popularity
+
+class TrainSessionRequest(BaseModel):
+    view_logs: List[SessionViewLog]
+
+# --- Evaluation Models ---
+class EvaluateRequest(BaseModel):
+    orders: List[OrderItemData]
+    products: List[ProductBrief]
+    train_ratio: Optional[float] = 0.8
+    top_n: Optional[int] = 10
+
+class ABClickLog(BaseModel):
+    group: str  # control, treatment
+    user_id: str
+    product_id: str
+    action: str  # impression, click, add_to_cart, purchase
+    timestamp: Optional[str] = None
+    revenue: float = 0.0
+
 class HealthResponse(BaseModel):
     status: str
     service: str
     version: str
 
 
-# Pipeline instance (singleton)
+# ============================================================
+# Singleton instances
+# ============================================================
+
 pipeline = None
+item_cf = None
+user_cf = None
+als_model = None
+hybrid = None
+session_rec = None
+ab_test = None
+
 
 def get_pipeline(n_clusters: int = 4) -> ClusteringPipeline:
     global pipeline
@@ -65,12 +168,69 @@ def get_pipeline(n_clusters: int = 4) -> ClusteringPipeline:
     return pipeline
 
 
+def get_cf_models(
+    orders_data: List[Dict],
+    products_data: List[Dict],
+    config: Optional[Dict] = None,
+):
+    """Lazy init hoặc huấn luyện lại CF models"""
+    global item_cf, user_cf, als_model, hybrid
+    
+    cf_config = CFConfig()
+    if config:
+        if 'n_neighbors' in config:
+            cf_config.n_neighbors = config['n_neighbors']
+        if 'n_factors' in config:
+            cf_config.n_factors = config['n_factors']
+        if 'n_iterations' in config:
+            cf_config.n_iterations = config['n_iterations']
+    
+    matrix, user_ids, product_ids = build_user_product_matrix(orders_data, products_data)
+    
+    item_cf = ItemItemCF(cf_config)
+    item_cf.fit(matrix, product_ids)
+    
+    user_cf = UserUserCF(cf_config)
+    user_cf.fit(matrix, user_ids, product_ids)
+    
+    als_model = ALSMatrixFactorization(cf_config)
+    als_model.fit(matrix, user_ids, product_ids)
+    
+    hybrid = HybridRecommender(item_cf, user_cf, als_model, config=cf_config)
+    
+    logger.info("CF models trained successfully")
+    return hybrid
+
+
+def get_session_recommender(view_logs: List[Dict]):
+    """Lazy init hoặc huấn luyện lại Session Recommender"""
+    global session_rec
+    
+    sessions = build_sessions_from_views(view_logs)
+    session_rec = SessionRecommender()
+    session_rec.fit(sessions)
+    
+    logger.info(f"Session recommender trained with {len(sessions)} sessions")
+    return session_rec
+
+
+def get_ab_test():
+    global ab_test
+    if ab_test is None:
+        ab_test = ABTestFramework()
+    return ab_test
+
+
+# ============================================================
+# Health & Info Endpoints
+# ============================================================
+
 @app.get("/", response_model=HealthResponse)
 async def health_check():
     return HealthResponse(
         status="healthy",
-        service="KhoaLuan ML Service",
-        version="1.0.0",
+        service="KhoaLuan AI Engine",
+        version="2.0.0",
     )
 
 
@@ -79,30 +239,57 @@ async def health():
     return {"status": "ok"}
 
 
+@app.get("/info")
+async def service_info():
+    """Thông tin chi tiết về service và các models available"""
+    return {
+        "service": "KhoaLuan AI Engine",
+        "version": "2.0.0",
+        "models": {
+            "clustering": {
+                "description": "RFM Analysis + K-Means customer segmentation",
+                "endpoints": ["/cluster/run", "/cluster/recommend", "/cluster/profiles", "/cluster/stats"],
+            },
+            "collaborative_filtering": {
+                "description": "Item-Item CF, User-User CF, ALS Matrix Factorization",
+                "endpoints": [
+                    "/cf/train", "/cf/recommend", "/cf/similar",
+                    "/cf/recommend/hybrid", "/cf/explain",
+                ],
+            },
+            "session_based": {
+                "description": "Co-occurrence + Sequence-based session recommendations",
+                "endpoints": [
+                    "/session/train", "/session/recommend",
+                ],
+            },
+            "evaluation": {
+                "description": "Metrics computation and A/B testing framework",
+                "endpoints": [
+                    "/evaluate/offline", "/abtest/log", "/abtest/report",
+                    "/abtest/compare", "/abtest/reset",
+                ],
+            },
+        },
+    }
+
+
+# ============================================================
+# Clustering Endpoints (existing, kept intact)
+# ============================================================
+
 @app.post("/cluster/run")
 async def run_clustering(request: ClusterRequest):
-    """
-    Chạy phân cụm khách hàng dựa trên dữ liệu đơn hàng
-    """
+    """Chạy phân cụm khách hàng dựa trên dữ liệu đơn hàng (RFM + K-Means)"""
     try:
         logger.info(f"Received clustering request: {len(request.orders)} orders, {request.n_clusters} clusters")
-
         orders_data = [
-            {
-                'user_id': o.user_id,
-                'total_amount': o.total_amount,
-                'created_at': o.created_at,
-            }
+            {'user_id': o.user_id, 'total_amount': o.total_amount, 'created_at': o.created_at}
             for o in request.orders
         ]
-
         pipeline = get_pipeline(request.n_clusters)
         result = pipeline.run(orders_data)
-
-        return {
-            "success": True,
-            "data": result,
-        }
+        return {"success": True, "data": result}
     except Exception as e:
         logger.error(f"Clustering failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -110,22 +297,14 @@ async def run_clustering(request: ClusterRequest):
 
 @app.post("/cluster/recommend")
 async def get_cluster_recommendations(request: RecommendRequest):
-    """
-    Gợi ý sản phẩm cho một cụm khách hàng
-    """
+    """Gợi ý sản phẩm cho một cụm khách hàng"""
     try:
         import pandas as pd
-
         products_df = pd.DataFrame([p.dict() for p in request.products])
         orders_data = [
-            {
-                'user_id': o.user_id,
-                'total_amount': o.total_amount,
-                'created_at': o.created_at,
-            }
+            {'user_id': o.user_id, 'total_amount': o.total_amount, 'created_at': o.created_at}
             for o in request.orders
         ]
-
         pipeline = get_pipeline()
         recommendations = pipeline.get_recommendations(
             cluster_id=request.cluster_id,
@@ -133,11 +312,7 @@ async def get_cluster_recommendations(request: RecommendRequest):
             orders_data=orders_data,
             top_n=request.top_n,
         )
-
-        return {
-            "success": True,
-            "data": recommendations,
-        }
+        return {"success": True, "data": recommendations}
     except Exception as e:
         logger.error(f"Recommendation failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -149,20 +324,497 @@ async def get_cluster_profiles():
     profiles = []
     for cluster_id in range(4):
         profile = ClusterProfile.get_cluster_profile(cluster_id)
+        profiles.append({'id': cluster_id, **profile})
+    return {"success": True, "data": profiles}
+
+
+@app.get("/cluster/stats")
+async def get_cluster_stats_direct():
+    """Lấy thông tin các cụm khách hàng mặc định"""
+    profiles = []
+    for cluster_id in range(4):
+        profile = ClusterProfile.get_cluster_profile(cluster_id)
         profiles.append({
             'id': cluster_id,
-            **profile,
+            'name': profile['name'],
+            'description': profile['description'],
+            'color': profile['color'],
         })
+    return {"success": True, "data": profiles}
 
-    return {
-        "success": True,
-        "data": profiles,
-    }
 
+# ============================================================
+# Collaborative Filtering Endpoints (NEW)
+# ============================================================
+
+@app.post("/cf/train")
+async def train_collaborative_filtering(request: CFRequest):
+    """Huấn luyện các Collaborative Filtering models"""
+    try:
+        orders_data = [
+            {'user_id': o.user_id, 'product_id': o.product_id, 'quantity': o.quantity}
+            for o in request.orders
+        ]
+        products_data = [p.dict() for p in request.products]
+        config = request.config or {}
+        
+        model_count = get_cf_models(orders_data, products_data, config)
+        
+        return {
+            "success": True,
+            "data": {
+                "message": "CF models trained successfully",
+                "models": ["Item-Item CF", "User-User CF", "ALS Matrix Factorization", "Hybrid"],
+                "n_orders": len(orders_data),
+                "n_products": len(products_data),
+            },
+        }
+    except Exception as e:
+        logger.error(f"CF training failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/cf/recommend")
+async def recommend_collaborative_filtering(request: CFRecommendRequest):
+    """Gợi ý sản phẩm bằng Collaborative Filtering cho một user cụ thể"""
+    try:
+        orders_data = [
+            {'user_id': o.user_id, 'product_id': o.product_id, 'quantity': o.quantity}
+            for o in request.orders
+        ]
+        products_data = [p.dict() for p in request.products]
+        
+        # Train CF models nếu chưa có
+        hybrid = get_cf_models(orders_data, products_data)
+        
+        # Xác định sản phẩm đã mua để exclude
+        user_products = set(
+            o['product_id'] for o in orders_data if o['user_id'] == request.user_id
+        )
+        
+        # Xây dựng user vector
+        matrix, user_ids, product_ids = build_user_product_matrix(orders_data, products_data)
+        if request.user_id in user_ids:
+            user_idx = user_ids.index(request.user_id)
+            user_vector = matrix[user_idx].toarray().flatten()
+        else:
+            # Fallback: user không có trong dữ liệu
+            user_vector = None
+        
+        strategy = request.strategy
+        if strategy == 'item_cf' and user_vector is not None:
+            recs = item_cf.recommend(user_vector, request.top_n, list(user_products))
+        elif strategy == 'user_cf':
+            recs = user_cf.recommend(request.user_id, request.top_n, list(user_products))
+        elif strategy == 'als':
+            recs = als_model.recommend(request.user_id, request.top_n, list(user_products))
+        else:
+            # Hybrid default
+            if user_vector is not None:
+                recs = hybrid.recommend(request.user_id, user_vector, request.top_n, list(user_products))
+            else:
+                recs = als_model.recommend(request.user_id, request.top_n, list(user_products))
+        
+        return {
+            "success": True,
+            "data": {
+                "user_id": request.user_id,
+                "strategy": strategy,
+                "recommendations": recs,
+            },
+        }
+    except Exception as e:
+        logger.error(f"CF recommendation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/cf/similar")
+async def get_similar_products_cf(request: SimilarProductsRequest):
+    """Lấy sản phẩm tương tự bằng Item-Item CF"""
+    try:
+        orders_data = [
+            {'user_id': o.user_id, 'product_id': o.product_id, 'quantity': o.quantity}
+            for o in request.orders
+        ]
+        products_data = [p.dict() for p in request.products]
+        
+        get_cf_models(orders_data, products_data)
+        
+        if item_cf is None or not item_cf.is_fitted:
+            raise HTTPException(status_code=400, detail="Item-Item CF not trained")
+        
+        similar = item_cf.get_similar_products(request.product_id, request.top_n)
+        
+        return {
+            "success": True,
+            "data": {
+                "product_id": request.product_id,
+                "similar_products": similar,
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Similar products failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/cf/recommend/hybrid")
+async def recommend_hybrid(request: CFRecommendRequest):
+    """Gợi ý bằng Hybrid (kết hợp tất cả CF methods)"""
+    try:
+        orders_data = [
+            {'user_id': o.user_id, 'product_id': o.product_id, 'quantity': o.quantity}
+            for o in request.orders
+        ]
+        products_data = [p.dict() for p in request.products]
+        
+        hybrid = get_cf_models(orders_data, products_data)
+        
+        matrix, user_ids, product_ids = build_user_product_matrix(orders_data, products_data)
+        user_products = set(
+            o['product_id'] for o in orders_data if o['user_id'] == request.user_id
+        )
+        
+        if request.user_id in user_ids:
+            user_idx = user_ids.index(request.user_id)
+            user_vector = matrix[user_idx].toarray().flatten()
+        else:
+            user_vector = np.zeros(len(product_ids))
+        
+        recs = hybrid.recommend(request.user_id, user_vector, request.top_n, list(user_products))
+        
+        return {
+            "success": True,
+            "data": {
+                "user_id": request.user_id,
+                "strategy": "hybrid",
+                "recommendations": recs,
+            },
+        }
+    except Exception as e:
+        logger.error(f"Hybrid recommendation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/cf/explain")
+async def explain_recommendations(request: CFRecommendRequest):
+    """Giải thích chi tiết tại sao sản phẩm được recommend (cho admin)"""
+    try:
+        orders_data = [
+            {'user_id': o.user_id, 'product_id': o.product_id, 'quantity': o.quantity}
+            for o in request.orders
+        ]
+        products_data = [p.dict() for p in request.products]
+        
+        hybrid = get_cf_models(orders_data, products_data)
+        
+        matrix, user_ids, product_ids = build_user_product_matrix(orders_data, products_data)
+        user_products = set(
+            o['product_id'] for o in orders_data if o['user_id'] == request.user_id
+        )
+        
+        if request.user_id in user_ids:
+            user_idx = user_ids.index(request.user_id)
+            user_vector = matrix[user_idx].toarray().flatten()
+        else:
+            user_vector = np.zeros(len(product_ids))
+        
+        explanation = hybrid.get_recommendation_explanation(
+            request.user_id, user_vector, request.top_n, list(user_products)
+        )
+        
+        return {
+            "success": True,
+            "data": explanation,
+        }
+    except Exception as e:
+        logger.error(f"Explain recommendations failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
+# Session-Based Endpoints (NEW)
+# ============================================================
+
+@app.post("/session/train")
+async def train_session_model(request: TrainSessionRequest):
+    """Huấn luyện Session-based recommender từ view logs"""
+    try:
+        view_logs = [
+            {'user_id': v.user_id, 'product_id': v.product_id, 'timestamp': v.timestamp}
+            for v in request.view_logs
+        ]
+        
+        get_session_recommender(view_logs)
+        n_sessions = len(build_sessions_from_views(view_logs))
+        
+        return {
+            "success": True,
+            "data": {
+                "message": "Session recommender trained successfully",
+                "n_view_logs": len(view_logs),
+                "n_sessions": n_sessions,
+            },
+        }
+    except Exception as e:
+        logger.error(f"Session training failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/session/recommend")
+async def recommend_session(request: SessionRecommendRequest):
+    """Gợi ý sản phẩm dựa trên phiên hiện tại"""
+    try:
+        # Train nếu có view_logs và chưa có model
+        if request.view_logs and (session_rec is None):
+            view_logs = [
+                {'user_id': v.user_id, 'product_id': v.product_id, 'timestamp': v.timestamp}
+                for v in request.view_logs
+            ]
+            get_session_recommender(view_logs)
+        
+        if session_rec is None:
+            # Fallback: nếu không có session data, trả về lỗi
+            raise HTTPException(
+                status_code=400,
+                detail="Session recommender chưa được huấn luyện. Gửi view_logs qua /session/train trước."
+            )
+        
+        # KHÔNG truyền exclude_ids — SessionRecommender tự xử lý loại trừ session_items khỏi kết quả
+        # Bug cũ: exclude_ids = [p.id for p in request.products] loại trừ TẤT CẢ sản phẩm
+        recs = session_rec.recommend(
+            request.session_items,
+            request.top_n,
+            strategy=request.strategy,
+        )
+        
+        return {
+            "success": True,
+            "data": {
+                "strategy": request.strategy,
+                "session_items_count": len(request.session_items),
+                "recommendations": recs,
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Session recommendation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
+# Evaluation Endpoints (NEW)
+# ============================================================
+
+@app.post("/evaluate/offline")
+async def evaluate_offline(request: EvaluateRequest):
+    """
+    Đánh giá offline recommendation quality.
+    
+    Chia dữ liệu train/test theo thời gian, tính metrics:
+    - Precision@K, Recall@K, F1@K
+    - Hit Rate, MAP, NDCG
+    - Coverage, Popularity Bias
+    """
+    try:
+        orders_data = [
+            {'user_id': o.user_id, 'product_id': o.product_id, 'quantity': o.quantity,
+             'created_at': o.created_at or '2024-01-01'}
+            for o in request.orders
+        ]
+        products_data = [p.dict() for p in request.products]
+        top_n = request.top_n
+        
+        # Chia train/test
+        train_data, test_data = train_test_split_by_time(orders_data, test_ratio=1 - request.train_ratio)
+        
+        if not train_data or not test_data:
+            raise HTTPException(status_code=400, detail="Không đủ dữ liệu để đánh giá")
+        
+        # Train CF trên train data
+        get_cf_models(train_data, products_data)
+        
+        # Lấy unique users từ test set
+        test_users = list(set(o['user_id'] for o in test_data))
+        
+        recommendations_list = []
+        relevant_list = []
+        
+        for user_id in test_users:
+            # Xây dựng relevant set từ test data
+            relevant = build_relevant_set(test_data, user_id)
+            if not relevant:
+                continue
+            
+            # Xây dựng user vector từ train data
+            matrix, user_ids, product_ids = build_user_product_matrix(train_data, products_data)
+            user_products = set(
+                o['product_id'] for o in train_data if o['user_id'] == user_id
+            )
+            
+            if user_id in user_ids:
+                user_idx = user_ids.index(user_id)
+                user_vector = matrix[user_idx].toarray().flatten()
+                recs = hybrid.recommend(user_id, user_vector, top_n, list(user_products))
+            else:
+                # Cold-start user
+                recs = []
+            
+            recommendations_list.append([r['product_id'] for r in recs])
+            relevant_list.append(relevant)
+        
+        if not recommendations_list:
+            return {
+                "success": True,
+                "data": {
+                    "message": "Không có đủ dữ liệu để đánh giá",
+                    "n_train": len(train_data),
+                    "n_test": len(test_data),
+                    "n_test_users": len(test_users),
+                },
+            }
+        
+        # Tính tất cả metrics
+        product_popularity = {}
+        if session_rec and session_rec.cooccurrence.is_fitted:
+            product_popularity = dict(session_rec.cooccurrence.product_popularity)
+        
+        result = RecommendationMetrics.evaluate_all(
+            recommendations_list, relevant_list,
+            product_popularity=product_popularity,
+            total_products=len(products_data),
+            k=top_n,
+        )
+        
+        return {
+            "success": True,
+            "data": {
+                "metrics": {
+                    "precision": result.precision,
+                    "recall": result.recall,
+                    "f1_score": result.f1_score,
+                    "hit_rate": result.hit_rate,
+                    "map_score": result.map_score,
+                    "ndcg_score": result.ndcg_score,
+                    "coverage": result.coverage,
+                    "popularity_bias": result.popularity_bias,
+                },
+                "details": {
+                    "n_train_samples": len(train_data),
+                    "n_test_samples": len(test_data),
+                    "n_test_users": len(test_users),
+                    "n_users_evaluated": result.n_samples,
+                    "top_k": top_n,
+                },
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Evaluation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
+# A/B Testing Endpoints (NEW)
+# ============================================================
+
+@app.post("/abtest/log")
+async def log_ab_test_interaction(log: ABClickLog):
+    """Ghi nhận tương tác user cho A/B test"""
+    try:
+        tester = get_ab_test()
+        tester.log_interaction(
+            group=log.group,
+            user_id=log.user_id,
+            product_id=log.product_id,
+            action=log.action,
+            timestamp=log.timestamp,
+            revenue=log.revenue,
+        )
+        return {
+            "success": True,
+            "data": {
+                "message": "Interaction logged",
+                "group": log.group,
+                "action": log.action,
+            },
+        }
+    except Exception as e:
+        logger.error(f"A/B log failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/abtest/log_batch")
+async def log_ab_test_batch(logs: List[ABClickLog]):
+    """Ghi nhận nhiều tương tác một lúc (batch)"""
+    try:
+        tester = get_ab_test()
+        for log in logs:
+            tester.log_interaction(
+                group=log.group,
+                user_id=log.user_id,
+                product_id=log.product_id,
+                action=log.action,
+                timestamp=log.timestamp,
+                revenue=log.revenue,
+            )
+        return {
+            "success": True,
+            "data": {
+                "message": f"{len(logs)} interactions logged",
+            },
+        }
+    except Exception as e:
+        logger.error(f"A/B batch log failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/abtest/report")
+async def get_ab_test_report():
+    """Lấy báo cáo A/B test tổng hợp"""
+    try:
+        tester = get_ab_test()
+        report = tester.get_summary_report()
+        return {"success": True, "data": report}
+    except Exception as e:
+        logger.error(f"A/B report failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/abtest/compare")
+async def compare_ab_test_groups(group_a: str = "control", group_b: str = "treatment"):
+    """So sánh hiệu quả giữa 2 nhóm A/B test"""
+    try:
+        tester = get_ab_test()
+        comparison = tester.compare_groups(group_a, group_b)
+        return {"success": True, "data": comparison}
+    except Exception as e:
+        logger.error(f"A/B comparison failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/abtest/reset")
+async def reset_ab_test():
+    """Reset dữ liệu A/B test"""
+    try:
+        tester = get_ab_test()
+        tester.reset()
+        return {"success": True, "data": {"message": "A/B test data reset"}}
+    except Exception as e:
+        logger.error(f"A/B reset failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
+# Main entry point
+# ============================================================
 
 if __name__ == "__main__":
     uvicorn.run(
-        "api:app",
+        "clustering.api:app",
         host="0.0.0.0",
         port=8000,
         reload=True,

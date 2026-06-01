@@ -35,7 +35,7 @@ const PartnerProductsPage = () => {
       const { data } = await api.get('/categories');
       setCategories(data.data);
     } catch (err) {
-      console.error('Failed to fetch categories');
+      // Silent
     }
   };
 

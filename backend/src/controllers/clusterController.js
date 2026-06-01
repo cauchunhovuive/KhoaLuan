@@ -1,6 +1,7 @@
 const { prisma } = require('../config/database');
 const AppError = require('../utils/AppError');
 const asyncHandler = require('../utils/asyncHandler');
+const mlService = require('../services/mlService');
 
 // @desc    Get all clusters
 // @route   GET /api/clusters
@@ -109,15 +110,8 @@ const runClustering = asyncHandler(async (req, res) => {
     created_at: o.createdAt.toISOString(),
   }));
 
-  // Trigger ML service to re-cluster
-  const mlServiceUrl = process.env.ML_SERVICE_URL || 'http://localhost:8000';
-  const response = await fetch(`${mlServiceUrl}/cluster/run`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ orders: ordersData }),
-  });
-
-  const result = await response.json();
+  // Use mlService to trigger clustering
+  const result = await mlService.runClustering(ordersData);
   if (!result.success) {
     throw new AppError('Phân cụm thất bại: ' + (result.detail || 'Lỗi ML service'), 500);
   }
@@ -156,7 +150,7 @@ const runClustering = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Get cluster statistics
+// @desc    Get cluster statistics (enhanced with ML profiles)
 // @route   GET /api/clusters/stats
 const getClusterStats = asyncHandler(async (req, res) => {
   const clusters = await prisma.cluster.findMany({
@@ -166,15 +160,46 @@ const getClusterStats = asyncHandler(async (req, res) => {
   });
 
   const totalUsers = clusters.reduce((sum, c) => sum + c._count.users, 0);
-  const stats = clusters.map((c) => ({
-    id: c.id,
-    name: c.name,
-    color: c.color,
-    userCount: c._count.users,
-    percentage: totalUsers ? ((c._count.users / totalUsers) * 100).toFixed(1) : 0,
-  }));
 
-  res.json({ success: true, data: { clusters: stats, totalUsers } });
+  // Try to get ML cluster profiles for additional metadata
+  let mlProfiles = [];
+  try {
+    mlProfiles = await mlService.getClusterProfiles();
+  } catch (e) {
+    // ML not available
+  }
+
+  const mlProfileMap = new Map(mlProfiles.map(p => [p.id, p]));
+
+  const stats = clusters.map((c, idx) => {
+    const mlProfile = mlProfileMap.get(idx) || {};
+    return {
+      id: c.id,
+      name: c.name,
+      color: c.color || mlProfile.color,
+      description: mlProfile.description || '',
+      userCount: c._count.users,
+      percentage: totalUsers ? ((c._count.users / totalUsers) * 100).toFixed(1) : 0,
+      rfmProfile: mlProfile.rfm_scores || null,
+    };
+  });
+
+  res.json({ success: true, data: { clusters: stats, totalUsers, mlConnected: mlProfiles.length > 0 } });
 });
 
-module.exports = { getClusters, getCluster, createCluster, updateCluster, deleteCluster, runClustering, getClusterStats };
+// @desc    Get ML cluster profiles
+// @route   GET /api/clusters/ml-profiles
+const getMLClusterProfiles = asyncHandler(async (req, res) => {
+  const profiles = await mlService.getClusterProfiles();
+  const stats = await mlService.getClusterStats();
+  res.json({
+    success: true,
+    data: {
+      profiles,
+      stats,
+      healthy: true,
+    },
+  });
+});
+
+module.exports = { getClusters, getCluster, createCluster, updateCluster, deleteCluster, runClustering, getClusterStats, getMLClusterProfiles };

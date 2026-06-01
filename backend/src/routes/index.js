@@ -23,5 +23,7 @@ router.use('/flash-sales', require('./flashSales'));
 router.use('/refunds', require('./refunds'));
 router.use('/violations', require('./violations'));
 router.use('/audit', require('./audit'));
+router.use('/shops', require('./shops'));
+router.use('/ml', require('./ml'));
 
 module.exports = router;

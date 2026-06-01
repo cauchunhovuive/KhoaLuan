@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { FiChevronLeft, FiChevronRight, FiArrowRight } from 'react-icons/fi';
 import api from '../../services/api';
+import { preloadCriticalImages } from '../../utils/useImagePreloader';
 
 const BannerSlider = () => {
   const [banners, setBanners] = useState([]);
@@ -11,8 +12,14 @@ const BannerSlider = () => {
   useEffect(() => {
     api.get('/banners')
       .then(({ data }) => {
-        setBanners(data.data || []);
+        const bannersData = data.data || [];
+        setBanners(bannersData);
         setLoading(false);
+        // Preload banner images immediately for hero above the fold
+        const urls = bannersData.map((b) => b.imageUrl).filter(Boolean);
+        if (urls.length > 0) {
+          preloadCriticalImages(urls);
+        }
       })
       .catch(() => setLoading(false));
   }, []);

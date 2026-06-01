@@ -13,4 +13,18 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Split heavy charting library into its own chunk
+          'vendor-charts': ['recharts'],
+          // Split icon library into its own cacheable chunk
+          'vendor-icons': ['react-icons'],
+        },
+      },
+    },
+    // Increase chunk size warning limit (icons + charts legitimately exceed 500KB)
+    chunkSizeWarningLimit: 600,
+  },
 });

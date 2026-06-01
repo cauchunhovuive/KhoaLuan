@@ -5,7 +5,8 @@ import { fetchProducts, fetchCategories } from '../store/productSlice';
 import ProductCard from '../components/common/ProductCard';
 import Pagination from '../components/common/Pagination';
 import LoadingSpinner from '../components/common/LoadingSpinner';
-import { FiFilter, FiX, FiSliders } from 'react-icons/fi';
+import { FiFilter, FiX, FiSliders, FiShoppingBag } from 'react-icons/fi';
+import api from '../services/api';
 
 const SORT_OPTIONS = [
   { value: '-createdAt', label: 'Mới nhất' },
@@ -25,6 +26,7 @@ const ProductListPage = () => {
   const currentPage = parseInt(searchParams.get('page')) || 1;
   const currentCategory = searchParams.get('category') || '';
   const currentSort = searchParams.get('sort') || '-createdAt';
+  const currentPartner = searchParams.get('partner') || '';
 
   useEffect(() => {
     dispatch(fetchCategories());
@@ -35,8 +37,21 @@ const ProductListPage = () => {
     if (currentCategory) params.category = currentCategory;
     if (priceRange.min) params.minPrice = priceRange.min;
     if (priceRange.max) params.maxPrice = priceRange.max;
+    if (currentPartner) params.partner = currentPartner;
     dispatch(fetchProducts(params));
-  }, [dispatch, currentPage, currentCategory, currentSort, priceRange]);
+  }, [dispatch, currentPage, currentCategory, currentSort, priceRange, currentPartner]);
+
+  // Show partner/shop name in the header
+  const [partnerName, setPartnerName] = useState('');
+  useEffect(() => {
+    if (currentPartner) {
+      api.get(`/shops/${currentPartner}`).then(({ data }) => {
+        setPartnerName(data.data.partner.storeName);
+      }).catch(() => {});
+    } else {
+      setPartnerName('');
+    }
+  }, [currentPartner]);
 
   const updateParams = (key, value) => {
     const params = new URLSearchParams(searchParams);
@@ -56,7 +71,16 @@ const ProductListPage = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-ink">Sản phẩm</h1>
+          <h1 className="text-3xl font-bold text-ink">
+            {partnerName ? (
+              <span className="flex items-center space-x-2">
+                <FiShoppingBag className="text-2xl text-primary-600" />
+                <span>{partnerName}</span>
+              </span>
+            ) : (
+              'Sản phẩm'
+            )}
+          </h1>
           <p className="text-ink-secondary mt-1">{pagination.total} sản phẩm</p>
         </div>
         <div className="flex items-center space-x-3 mt-4 md:mt-0">

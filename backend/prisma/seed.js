@@ -2,6 +2,7 @@ require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') }
 
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
+const { getProductImage } = require('./seed-images');
 
 const prisma = new PrismaClient();
 
@@ -203,7 +204,7 @@ async function main() {
           description: `Sản phẩm ${p.name} chất lượng cao, chính hãng.`,
           price: p.price,
           discountPrice: p.discountPrice,
-          images: [`https://picsum.photos/seed/${p.slug}/400/400`],
+          images: [getProductImage(p.slug, categories[p.categoryIdx].slug)],
           stock: p.stock,
           soldCount: p.soldCount,
           rating: p.rating,

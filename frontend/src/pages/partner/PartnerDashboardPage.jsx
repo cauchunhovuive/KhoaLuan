@@ -53,7 +53,7 @@ const PartnerDashboardPage = () => {
       setData(dashboardRes.data.data);
       setRevenueData(revenueRes.data.data);
     } catch (err) {
-      console.error('Failed to fetch partner dashboard:', err);
+      // Silent - dashboard will show empty state
     } finally {
       setLoading(false);
     }

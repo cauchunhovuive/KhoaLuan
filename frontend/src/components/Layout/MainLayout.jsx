@@ -2,6 +2,7 @@ import React from 'react';
 import { Outlet } from 'react-router-dom';
 import Navbar from './Navbar';
 import Footer from './Footer';
+import ChatFloating from '../common/ChatFloating';
 
 const MainLayout = () => {
   return (
@@ -11,6 +12,8 @@ const MainLayout = () => {
         <Outlet />
       </main>
       <Footer />
+      {/* Floating chat widget — xuất hiện trên mọi trang */}
+      <ChatFloating />
     </div>
   );
 };

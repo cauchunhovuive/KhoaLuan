@@ -2,6 +2,8 @@ node_modules/
 dist/
 build/
 .env
+.env.local
+.env.production
 *.log
 __pycache__/
 *.pyc
@@ -15,3 +17,25 @@ coverage/
 *.tsbuildinfo
 expo/
 .expo/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+*.DS_Store
+
+# Test artifacts
+login_resp.txt
+nul
+
+# ML artifacts
+backend/ml/__pycache__/
+backend/ml/**/*.pyc
+backend/ml/**/.pytest_cache/
+
+# Docker volumes
+postgres_data/
