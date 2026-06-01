@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { FiSearch, FiShoppingCart, FiUser, FiLogOut, FiMenu, FiX, FiHeart, FiMapPin, FiMessageSquare, FiHeart as FiHeartOutline, FiChevronRight } from 'react-icons/fi';
+import { FiSearch, FiShoppingCart, FiUser, FiLogOut, FiMenu, FiX, FiMapPin, FiMessageSquare, FiHeart as FiHeartOutline, FiChevronRight, FiZap, FiTag } from 'react-icons/fi';
 import { logout } from '../../store/authSlice';
 
 const Navbar = () => {
@@ -68,8 +68,10 @@ const Navbar = () => {
               Sản phẩm
             </Link>
 
-            <Link to="/wishlist" className="relative p-2 text-ink-secondary hover:text-ink hover:bg-black/[0.04] rounded-full transition-all duration-200">
-              <FiHeart className="text-sm" />
+            <Link to="/flash-sales" className="relative px-3 py-1.5 text-xs font-semibold text-red-600 hover:text-red-700 hover:bg-red-50 rounded-full transition-all duration-200 flex items-center space-x-1">
+              <FiZap className="text-[11px]" />
+              <span>Flash Sale</span>
+              <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse-soft" />
             </Link>
 
             <Link to="/cart" className="relative p-2 text-ink-secondary hover:text-ink hover:bg-black/[0.04] rounded-full transition-all duration-200">
@@ -95,6 +97,9 @@ const Navbar = () => {
                   {(user?.role === 'CUSTOMER' || !user?.role) && (
                     <>
                       <Link to="/orders" className="block px-4 py-2 text-sm text-ink-secondary hover:text-ink hover:bg-black/[0.03] transition-colors">Đơn hàng của tôi</Link>
+                      <Link to="/coupons" className="block px-4 py-2 text-sm text-ink-secondary hover:text-ink hover:bg-black/[0.03] transition-colors">
+                        <FiTag className="inline mr-1.5 text-xs" /> Kho voucher
+                      </Link>
                       <Link to="/addresses" className="block px-4 py-2 text-sm text-ink-secondary hover:text-ink hover:bg-black/[0.03] transition-colors">
                         <FiMapPin className="inline mr-1.5 text-xs" /> Địa chỉ giao hàng
                       </Link>
@@ -166,7 +171,8 @@ const Navbar = () => {
 
               {[
                 { to: '/products', label: 'Sản phẩm', icon: null },
-                { to: '/wishlist', label: 'Yêu thích', icon: FiHeart },
+                { to: '/flash-sales', label: 'Flash Sale' },
+                { to: '/coupons', label: 'Kho voucher' },
                 { to: '/cart', label: `Giỏ hàng${count > 0 ? ` (${count})` : ''}`, icon: FiShoppingCart },
               ].map((item, idx) => (
                 <Link key={item.to} to={item.to}
@@ -190,6 +196,9 @@ const Navbar = () => {
                     <>
                       <Link to="/orders" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-between px-4 py-3.5 text-ink-secondary hover:text-ink hover:bg-surface-secondary rounded-2xl transition-colors">
                         <span>Đơn hàng</span> <FiChevronRight className="text-gray-300 text-sm" />
+                      </Link>
+                      <Link to="/coupons" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-between px-4 py-3.5 text-ink-secondary hover:text-ink hover:bg-surface-secondary rounded-2xl transition-colors">
+                        <span>Kho voucher</span> <FiChevronRight className="text-gray-300 text-sm" />
                       </Link>
                       <Link to="/chat" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-between px-4 py-3.5 text-ink-secondary hover:text-ink hover:bg-surface-secondary rounded-2xl transition-colors">
                         <span>Tin nhắn</span> <FiChevronRight className="text-gray-300 text-sm" />

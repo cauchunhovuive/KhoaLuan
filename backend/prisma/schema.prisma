@@ -71,6 +71,7 @@ model User {
   products        Product[]      @relation("PartnerProducts")
   couponsCreated  Coupon[]
   couponUsages    CouponUsage[]
+  savedCoupons    SavedCoupon[]
   addresses        Address[]
   refunds          Refund[]
   auditLogs        AuditLog[]
@@ -259,6 +260,7 @@ model Coupon {
   createdBy User          @relation(fields: [createdById], references: [id])
   orders    Order[]
   usage     CouponUsage[]
+  savedBy   SavedCoupon[]
 }
 
 model CouponUsage {
@@ -385,6 +387,19 @@ model FlashSaleProduct {
   product   Product   @relation(fields: [productId], references: [id])
 
   @@unique([flashSaleId, productId])
+}
+
+// ─── SavedCoupon: Mã giảm giá user đã lưu ───
+model SavedCoupon {
+  id        String   @id @default(uuid())
+  userId    String
+  couponId  String
+  savedAt   DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id])
+  coupon Coupon @relation(fields: [couponId], references: [id])
+
+  @@unique([userId, couponId])
 }
 
 // ─── Violation: Vi phạm shop/sản phẩm ───

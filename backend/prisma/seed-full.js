@@ -702,28 +702,7 @@ async function main() {
   }
   console.log(`  ✔ Thêm ${cartCount} mục giỏ hàng`);
 
-  // ─── 11. WISHLIST ITEMS ───
-  const wishUsers = [c1, c2, c4, c5, c8].filter(Boolean);
-  let wishCount = 0;
-  for (const user of wishUsers) {
-    const productCount = Math.floor(Math.random() * 4) + 2;
-    for (let i = 0; i < productCount; i++) {
-      const product = extraProducts[Math.floor(Math.random() * extraProducts.length)];
-      if (!product) continue;
-      const existing = await prisma.wishlistItem.findUnique({
-        where: { userId_productId: { userId: user.id, productId: product.id } },
-      });
-      if (!existing) {
-        await prisma.wishlistItem.create({
-          data: { userId: user.id, productId: product.id },
-        });
-        wishCount++;
-      }
-    }
-  }
-  console.log(`  ✔ Thêm ${wishCount} mục yêu thích`);
-
-  // ─── 12. RECOMMENDATIONS ───
+  // ─── 11. RECOMMENDATIONS ───
   let recCount = 0;
   for (const user of [c1, c2, c3, c4, c5].filter(Boolean)) {
     // Lấy sản phẩm từ các đơn hàng của user
@@ -799,7 +778,6 @@ async function main() {
     { key: 'default_shipping_fee', value: JSON.stringify(30000) },
     { key: 'free_shipping_threshold', value: JSON.stringify(500000) },
     { key: 'max_cart_items', value: JSON.stringify(50) },
-    { key: 'max_wishlist_items', value: JSON.stringify(100) },
     { key: 'default_page_size', value: JSON.stringify(20) },
     { key: 'enable_partner_registration', value: JSON.stringify(true) },
     { key: 'support_phone', value: JSON.stringify('1900-123-456') },
@@ -934,7 +912,6 @@ async function main() {
   console.log(`   📋 Đơn hàng: ${await prisma.order.count()}`);
   console.log(`   ⭐ Đánh giá: ${await prisma.review.count()}`);
   console.log(`   🛒 Giỏ hàng: ${await prisma.cartItem.count()}`);
-  console.log(`   ❤️  Yêu thích: ${await prisma.wishlistItem.count()}`);
   console.log(`   🏷️  Mã giảm giá: ${await prisma.coupon.count()}`);
   console.log(`   🔖 Biến thể SP: ${await prisma.productVariant.count()}`);
   console.log(`   📌 Gợi ý SP: ${await prisma.recommendation.count()}`);

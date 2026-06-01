@@ -5,7 +5,6 @@ import productReducer from './productSlice';
 import uiReducer from './uiSlice';
 import settingsReducer from './settingsSlice';
 import notificationReducer from './notificationSlice';
-import wishlistReducer from './wishlistSlice';
 
 export const store = configureStore({
   reducer: {
@@ -15,6 +14,5 @@ export const store = configureStore({
     ui: uiReducer,
     settings: settingsReducer,
     notifications: notificationReducer,
-    wishlist: wishlistReducer,
   },
 });

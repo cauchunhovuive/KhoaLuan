@@ -13,7 +13,6 @@ router.use('/dashboard', require('./dashboard'));
 router.use('/reviews', require('./reviews'));
 router.use('/settings', require('./settings'));
 router.use('/notifications', require('./notifications'));
-router.use('/wishlist', require('./wishlist'));
 router.use('/coupons', require('./coupons'));
 router.use('/partner', require('./partner'));
 router.use('/addresses', require('./addresses'));

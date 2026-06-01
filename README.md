@@ -76,21 +76,25 @@
 ## 🏗️ Kiến trúc tổng quan
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│                     Frontend Web (React + Vite + Tailwind)            │
-│                  http://localhost:3000                                 │
-│                   + Mobile App (React Native + Expo)                   │
-├──────────────────────────────────────────────────────────────────────┤
-│              Backend API (Node.js + Express + Prisma ORM)              │
-│                  http://localhost:5000                                 │
-├────────────────────┬─────────────────────────────────────────────────┤
-│   ML Service       │    Database & Cache                               │
-│   (Python/FastAPI) │    PostgreSQL 15 + Redis 7                        │
-│   http://localhost:8000 │                                              │
-└────────────────────┴─────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                     Frontend Web (React + Vite + Tailwind)               │
+│                  http://localhost:3000                                    │
+│                   + Mobile App (React Native + Expo)                      │
+├────────────────────────────────────────────────────────────────────────┤
+│              Backend API (Node.js + Express + Prisma ORM)                 │
+│                  http://localhost:5000                                    │
+├────────────────────┬────────────────────────────────────────────────────┤
+│   ML Service       │    Database & Cache                                  │
+│   (Python/FastAPI) │    PostgreSQL 15 + Redis 7                           │
+│   http://localhost:8000 │         + ChromaDB (vectors)                     │
+├────────────────────┴────────────────────────────────────────────────────┤
+│   Ollama Local (LLM)                                                     │
+│   http://localhost:11434                                                  │
+│   Model: llama3.2:3b — Knowledge Base: ChromaDB + sentence-transformers   │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
-Hệ thống gồm **5 Docker services**: `postgres`, `redis`, `backend`, `ml-service`, `frontend`
+Hệ thống gồm **5 Docker services**: `postgres`, `redis`, `backend`, `ml-service`, `frontend` + **Ollama** (chạy native)
 
 ### Dữ liệu mẫu (seed)
 
@@ -231,16 +235,17 @@ Partner có không gian riêng với các tính năng — **tự xử lý đơn 
 |-----------|-------|
 | 🔐 **Đăng ký / Đăng nhập** | JWT access + refresh token |
 | 🔍 **Tìm kiếm & duyệt** | Sản phẩm theo danh mục, giá, đánh giá, tìm kiếm (10/trang) |
+| 🏷️ **Bộ lọc thông minh** | Mùa hè, Mới nhất, Bán chạy, Đánh giá cao, AI Đề xuất (có active state) |
 | 🛒 **Giỏ hàng** | Thêm, sửa, xóa sản phẩm trong giỏ |
 | 💳 **Đặt hàng** | Thanh toán COD / Banking / MoMo / VNPAY |
 | 📋 **Theo dõi đơn hàng** | PENDING → CONFIRMED → SHIPPING → DELIVERED (10/trang) |
-| 🎫 **Mã giảm giá** | Áp dụng mã giảm giá khi đặt hàng |
-| ❤️ **Yêu thích** | Danh sách sản phẩm yêu thích |
+| 🎫 **Kho voucher** | Xem & lưu mã giảm giá, sao chép mã, lọc theo loại |
+| 🎫 **Áp dụng mã giảm giá** | Nhập mã giảm giá khi đặt hàng |
 | 👥 **Theo dõi shop** | Theo dõi / bỏ theo dõi cửa hàng yêu thích |
 | ⭐ **Đánh giá sản phẩm** | Đánh giá và xem phản hồi từ người bán |
 | 📍 **Địa chỉ giao hàng** | Quản lý nhiều địa chỉ giao hàng |
 | 💬 **Chat với shop (Floating)** | Widget chat nổi — trò chuyện trực tiếp với shop mọi lúc |
-| 🤖 **Trợ lý AI (Floating)** | Widget chat AI nổi — hỏi đáp sản phẩm, chính sách, vận chuyển |
+| 🤖 **Trợ lý AI (RAG + Ollama)** | Widget chat AI nổi — hỏi đáp sản phẩm, chính sách, vận chuyển dựa trên knowledge base thật (ChromaDB + Ollama local) |
 | 💰 **Yêu cầu hoàn tiền** | Gửi yêu cầu hoàn tiền cho đơn đã giao |
 | 🚨 **Báo cáo vi phạm** | Báo cáo shop/sản phẩm vi phạm |
 | 🚚 **Xác nhận đã nhận hàng** | Xác nhận đã nhận được hàng |
@@ -350,10 +355,11 @@ ML Service chạy riêng biệt với backend (Python + FastAPI), cung cấp 4 n
 | Layer | Công nghệ |
 |-------|-----------|
 | **Frontend Web** | React 18 + Vite + Redux Toolkit + Tailwind CSS + React Router + Recharts + Chart.js + react-hot-toast + react-icons + Fontsource Geist |
-| **Frontend Components** | LazyImage (IntersectionObserver + blur-up), ChatFloating (Shop + AI tabs), code splitting (React.lazy), chunk optimization (Vite manualChunks) |
+| **Frontend Components** | LazyImage (IntersectionObserver + blur-up), ChatFloating (Shop + RAG AI tabs), CouponsPage (voucher + save), code splitting (React.lazy), chunk optimization (Vite manualChunks) |
 | **Mobile App** | React Native + Expo + React Navigation + Redux Toolkit + Axios |
 | **Backend API** | Node.js + Express.js + Prisma ORM + JWT + bcryptjs + ioredis + Winston + Morgan + Helmet + express-rate-limit + Joi |
-| **ML Service** | Python + FastAPI + scikit-learn (K-Means, RFM) + NumPy + SciPy |
+| **ML Service** | Python + FastAPI + scikit-learn (K-Means, RFM) + NumPy + SciPy + ChromaDB + sentence-transformers |
+| **AI Chat** | RAG (Retrieval-Augmented Generation) + Ollama local (llama3.2:3b) + ChromaDB vector store |
 | **Database** | PostgreSQL 15 (Alpine) |
 | **Cache** | Redis 7 (Alpine) với ioredis |
 | **Xác thực** | JWT (access token 7 ngày + refresh token 30 ngày) |
@@ -385,7 +391,6 @@ KHOALUAN/
 │   │   │   ├── partnerController.js      # Register, dashboard, products, orders
 │   │   │   ├── userController.js         # User CRUD, follow/unfollow shop
 │   │   │   ├── reviewController.js       # Đánh giá, phản hồi, thống kê
-│   │   │   ├── wishlistController.js     # Yêu thích
 │   │   │   ├── addressController.js      # Địa chỉ giao hàng
 │   │   │   ├── couponController.js       # Mã giảm giá (CRUD, validate, apply)
 │   │   │   ├── bannerController.js       # Banner trang chủ
@@ -424,8 +429,14 @@ KHOALUAN/
 │   └── ml/                               # ML Service (Python)
 │       ├── Dockerfile.ml
 │       ├── requirements.txt
+│       ├── rag/                              # 🆕 RAG Chat AI Module
+│       │   ├── __init__.py
+│       │   ├── knowledge_base.py             # ChromaDB vector store + sentence-transformers
+│       │   ├── rag_service.py                # RAG pipeline: search KB → Ollama generate
+│       │   ├── build_kb.py                   # Build KB from PostgreSQL
+│       │   └── data/                         # ChromaDB persistence directory
 │       ├── clustering/
-│       │   ├── api.py                    # FastAPI endpoints (tất cả ML routes)
+│       │   ├── api.py                    # FastAPI endpoints (tất cả ML routes + RAG endpoints)
 │       │   ├── clustering_service.py     # K-Means + RFM
 │       │   └── __init__.py
 │       ├── collaborative/
@@ -450,10 +461,8 @@ KHOALUAN/
 │       ├── store/
 │       │   ├── index.js                  # Redux store
 │       │   ├── authSlice.js              # JWT refresh
-│       │   ├── cartSlice.js              # Giỏ hàng
-│       │   ├── productSlice.js           # Sản phẩm
-│       │   ├── wishlistSlice.js          # Yêu thích
-│       │   ├── settingsSlice.js          # Cài đặt
+│       │   ├── cartSlice.js              # Giỏ hàng│   │   ├── productSlice.js           # Sản phẩm
+│   │   ├── settingsSlice.js          # Cài đặt
 │       │   ├── notificationSlice.js      # Thông báo (poll 30s)
 │       │   └── uiSlice.js                # UI state
 │       ├── services/
@@ -690,7 +699,7 @@ Recommendation → User?, Cluster?, Product (score, reason)
 11. **Flash Sale** — Sự kiện giảm giá có thời gian, quản lý số lượng
 12. **Mã giảm giá** — 22 mã PERCENTAGE/FIXED, có hạn, theo người dùng
 13. **Chat** — Giữa khách hàng và shop (poll-based)
-14. **Yêu thích & Follow shop** — Theo dõi sản phẩm và cửa hàng
+14. **Follow shop** — Theo dõi cửa hàng yêu thích
 15. **Hoàn tiền & Vi phạm** — Quy trình xử lý khiếu nại
 16. **Audit Log** — Ghi lại mọi hành động quan trọng
 17. **Thông báo realtime** — Poll 30s cho admin
@@ -700,13 +709,61 @@ Recommendation → User?, Cluster?, Product (score, reason)
 21. **Premium UI toàn diện** — Geist font, glass effects (glass-island), double-bezel cards, skeleton shimmer, stagger animations, custom cubic-bezier transitions
 22. **Phân trang đồng bộ** — 10 items/trang
 23. **Floating Chat Widget** — 2 tab (Shop + AI), glass-morphism panel, luôn sẵn sàng trên mọi trang
-24. **Trợ lý AI tích hợp** — Keyword-matching chatbot ngay trên web, gợi ý nhanh, typing indicator
+24. **Trợ lý AI (RAG + Ollama)** — RAG pipeline với ChromaDB vector store + Ollama local (llama3.2). Hỏi đáp thông minh về sản phẩm, chính sách, FAQ dựa trên knowledge base thật. Fallback keyword-matching khi Ollama không khả dụng.
 25. **Lazy Image Loading** — IntersectionObserver + blur-up transition, skeleton placeholder
 26. **Code Splitting** — React.lazy() cho 25+ admin/partner routes, Suspense fallback
 27. **Chunk Optimization** — Tách recharts/react-icons thành chunk riêng, tăng cache hit
 28. **Vietsub toàn bộ Admin AI** — ML, A/B Test, Clusters tiếng Việt
+29. **Kho voucher cho user** — Trang /coupons với tab Tất cả/Đã lưu, lọc theo loại, copy mã, đếm ngược hết hạn, skeleton loading
+30. **Avatar upload** — Chọn ảnh → FileReader base64 → dispatch updateProfile, validate file type & size, spinner loading
+31. **Order stats realtime** — Tổng đơn, hoàn thành, đã huỷ từ API, dùng pagination.total chính xác
+32. **HomePage filter pills** — Mùa hè, Mới nhất, Bán chạy, Đánh giá cao, AI Đề xuất — kết nối API sorting thật
+33. **PartnerLayout frame** — max-w-7xl container giới hạn hiển thị trên màn hình rộng
+34. **Loading skeleton cho CouponsPage** — FullPageSkeleton với hero + tabs + filters + card shimmer
 
 ---
+
+## 🤖 RAG Chat AI (Ollama + ChromaDB)
+
+### Kiến trúc
+
+```
+User → ChatFloating.jsx
+  → POST /api/chat/ai (Node.js proxy)
+    → POST /rag/ask (Python ML Service, port 8000)
+      → Knowledge Base (ChromaDB vector store)
+      → Ollama local (llama3.2, port 11434)
+      ← Response (có fallback keyword-matching)
+```
+
+### Knowledge Base
+
+Được xây dựng từ:
+| Loại | Nguồn | Số lượng (dự kiến) |
+|------|-------|:------------------:|
+| 📦 Sản phẩm | PostgreSQL (Product table) | ~500 |
+| 📁 Danh mục | PostgreSQL (Category table) | ~10 |
+| 📜 Chính sách | Static (vận chuyển, đổi trả, bảo hành, thanh toán) | 4 |
+| ❓ FAQ | Static (theo dõi đơn, huỷ đơn, đăng ký, giảm giá, follow shop, tìm kiếm) | 6 |
+| 📖 Hướng dẫn | Static (quản lý tài khoản, đặt hàng, flash sale) | 3 |
+
+### Cài đặt
+
+```bash
+# 1. Cài Ollama (https://ollama.com)
+# 2. Pull model
+ollama pull llama3.2:3b
+
+# 3. Cài Python dependencies
+cd backend/ml
+pip install -r requirements.txt
+
+# 4. Build knowledge base từ database
+python -m rag.build_kb --force
+
+# 5. Chạy ML service
+uvicorn clustering.api:app --host 0.0.0.0 --port 8000 --reload
+```
 
 *Đồ án tốt nghiệp — Hệ thống thương mại điện tử 3 nhánh với AI Recommendation Engine*
 

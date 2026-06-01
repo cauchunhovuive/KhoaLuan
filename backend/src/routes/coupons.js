@@ -7,10 +7,18 @@ const {
   deleteCoupon,
   getMyCoupons,
   validateCoupon,
+  getAvailableCoupons,
+  saveCoupon,
+  removeSavedCoupon,
+  getSavedCoupons,
 } = require('../controllers/couponController');
 const { protect, restrictTo } = require('../middleware/auth');
 
 // Customer routes
+router.get('/available', protect, getAvailableCoupons);
+router.get('/saved', protect, getSavedCoupons);
+router.post('/saved/:couponId', protect, saveCoupon);
+router.delete('/saved/:couponId', protect, removeSavedCoupon);
 router.post('/validate', protect, validateCoupon);
 
 // Partner routes - quản lý coupon của mình

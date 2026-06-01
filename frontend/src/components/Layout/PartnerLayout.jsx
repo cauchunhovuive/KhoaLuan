@@ -130,17 +130,19 @@ const PartnerLayout = () => {
           </Link>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6 bg-surface-secondary">
-          {!user?.isApproved && (
-            <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex items-start space-x-3">
-              <FiAlertCircle className="text-amber-500 text-lg flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-amber-800">Tài khoản đang chờ phê duyệt</p>
-                <p className="text-xs text-amber-700 mt-0.5">Bạn chưa thể đăng sản phẩm mới cho đến khi Admin phê duyệt tài khoản.</p>
+        <main className="flex-1 overflow-y-auto bg-surface-secondary">
+          <div className="max-w-7xl mx-auto px-6 py-6">
+            {!user?.isApproved && (
+              <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex items-start space-x-3">
+                <FiAlertCircle className="text-amber-500 text-lg flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-amber-800">Tài khoản đang chờ phê duyệt</p>
+                  <p className="text-xs text-amber-700 mt-0.5">Bạn chưa thể đăng sản phẩm mới cho đến khi Admin phê duyệt tài khoản.</p>
+                </div>
               </div>
-            </div>
-          )}
-          <Outlet />
+            )}
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

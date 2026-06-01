@@ -18,11 +18,12 @@ import OrdersPage from './pages/OrdersPage';
 import OrderDetailPage from './pages/OrderDetailPage';
 import ProfilePage from './pages/ProfilePage';
 import SearchPage from './pages/SearchPage';
-import WishlistPage from './pages/WishlistPage';
 import AddressManagementPage from './pages/AddressManagementPage';
 import UserChatPage from './pages/UserChatPage';
 import FollowedShopsPage from './pages/FollowedShopsPage';
 import ShopPage from './pages/ShopPage';
+import FlashSalePage from './pages/FlashSalePage';
+import UserCouponsPage from './pages/CouponsPage';
 
 // Partner Layout (needed at module level)
 import PartnerLayout from './components/Layout/PartnerLayout';
@@ -116,9 +117,6 @@ function App() {
         <Route path="profile" element={
           <ProtectedRoute><ProfilePage /></ProtectedRoute>
         } />
-        <Route path="wishlist" element={
-          <ProtectedRoute><WishlistPage /></ProtectedRoute>
-        } />
         <Route path="addresses" element={
           <ProtectedRoute><AddressManagementPage /></ProtectedRoute>
         } />
@@ -127,6 +125,10 @@ function App() {
         } />
         <Route path="followed-shops" element={
           <ProtectedRoute><FollowedShopsPage /></ProtectedRoute>
+        } />
+        <Route path="flash-sales" element={<FlashSalePage />} />
+        <Route path="coupons" element={
+          <ProtectedRoute><UserCouponsPage /></ProtectedRoute>
         } />
         <Route path="shop/:partnerId" element={<ShopPage />} />
       </Route>

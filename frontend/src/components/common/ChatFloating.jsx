@@ -8,31 +8,20 @@ import {
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
-// ─── AI Responses Simulator ───────────────────────────────
-const AI_RESPONSES = [
-  { keywords: ['xin chào', 'hello', 'hi', 'chào'], response: 'Chào bạn! Tôi là trợ lý AI của cửa hàng. Tôi có thể giúp gì cho bạn hôm nay? 😊' },
-  { keywords: ['sản phẩm', 'mua', 'tìm'], response: 'Bạn có thể tìm kiếm sản phẩm bằng thanh tìm kiếm ở đầu trang hoặc ghé thăm danh mục sản phẩm. Bạn cần tìm sản phẩm gì ạ?' },
-  { keywords: ['giá', 'bao nhiêu', 'giảm', 'khuyến mãi'], response: 'Các sản phẩm của chúng tôi có giá rất cạnh tranh! Bạn có thể xem chi tiết giá và khuyến mãi trên trang sản phẩm. Hiện tại có nhiều mã giảm giá đang chờ bạn!' },
-  { keywords: ['đơn hàng', 'order', 'đặt hàng'], response: 'Bạn có thể theo dõi đơn hàng trong mục "Đơn hàng của tôi" sau khi đăng nhập. Nếu cần hỗ trợ, hãy chat với shop qua tab "Shop" bên cạnh nhé!' },
-  { keywords: ['vận chuyển', 'ship', 'giao hàng'], response: 'Chúng tôi giao hàng toàn quốc! Miễn phí vận chuyển cho đơn hàng từ 500.000₫. Thời gian giao hàng từ 2-5 ngày tùy khu vực.' },
-  { keywords: ['trả', 'hoàn', 'đổi trả'], response: 'Chúng tôi hỗ trợ đổi trả trong vòng 7 ngày kể từ khi nhận hàng. Sản phẩm phải còn nguyên tem, chưa qua sử dụng.' },
-  { keywords: ['cảm ơn', 'thanks'], response: 'Cảm ơn bạn! Nếu cần hỗ trợ thêm, đừng ngần ngại chat với tôi nhé. Chúc bạn một ngày tốt lành! 🌟' },
-];
-
-const getAIResponse = (message) => {
-  const lower = message.toLowerCase();
-  for (const item of AI_RESPONSES) {
-    if (item.keywords.some(k => lower.includes(k))) {
-      return item.response;
-    }
+// ─── AI Chat via RAG API ───────────────────────────────
+const askAI = async (message, messageHistory) => {
+  try {
+    const { data } = await api.post('/chat/ai', {
+      question: message,
+      messages: messageHistory.length > 0
+        ? messageHistory.slice(-10).map(m => ({ role: m.role, content: m.content }))
+        : undefined,
+    });
+    return data.data?.answer || 'Xin lỗi, tôi không thể trả lời ngay lúc này.';
+  } catch (err) {
+    console.error('AI chat error:', err);
+    return 'Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại sau.';
   }
-  const fallbacks = [
-    'Cảm ơn bạn đã quan tâm! Tôi có thể giúp bạn tìm sản phẩm, kiểm tra đơn hàng, hoặc giải đáp thắc mắc về chính sách.',
-    'Tôi hiểu câu hỏi của bạn. Bạn có thể nói rõ hơn để tôi hỗ trợ tốt hơn không?',
-    'Rất vui được hỗ trợ bạn! Hãy cho tôi biết bạn cần gì nhé.',
-    'Tôi đang học hỏi mỗi ngày! Bạn có thể hỏi tôi về sản phẩm, giá cả, vận chuyển, hoặc đổi trả hàng.',
-  ];
-  return fallbacks[Math.floor(Math.random() * fallbacks.length)];
 };
 
 // ─── Component ────────────────────────────────────────────
@@ -118,21 +107,19 @@ const ChatFloating = () => {
     }
   };
 
-  const handleAISend = useCallback(() => {
+  const handleAISend = useCallback(async () => {
     if (!aiInput.trim()) return;
     const userMsg = aiInput.trim();
+    const history = aiMessages;
     setAiInput('');
 
     setAiMessages(prev => [...prev, { id: Date.now(), role: 'user', content: userMsg }]);
     setAiTyping(true);
 
-    // Simulate AI processing delay
-    setTimeout(() => {
-      const response = getAIResponse(userMsg);
-      setAiMessages(prev => [...prev, { id: Date.now() + 1, role: 'ai', content: response }]);
-      setAiTyping(false);
-    }, 800 + Math.random() * 600);
-  }, [aiInput]);
+    const response = await askAI(userMsg, history);
+    setAiMessages(prev => [...prev, { id: Date.now() + 1, role: 'ai', content: response }]);
+    setAiTyping(false);
+  }, [aiInput, aiMessages]);
 
   const toggleOpen = () => {
     setIsOpen(!isOpen);
@@ -424,14 +411,13 @@ const ChatFloating = () => {
                       {['Tìm sản phẩm', 'Chính sách đổi trả', 'Khuyến mãi', 'Vận chuyển'].map((suggestion) => (
                         <button
                           key={suggestion}
-                          onClick={() => {
+                          onClick={async () => {
+                            const history = aiMessages;
                             setAiMessages(prev => [...prev, { id: Date.now(), role: 'user', content: suggestion }]);
                             setAiTyping(true);
-                            setTimeout(() => {
-                              const response = getAIResponse(suggestion);
-                              setAiMessages(prev => [...prev, { id: Date.now() + 1, role: 'ai', content: response }]);
-                              setAiTyping(false);
-                            }, 600 + Math.random() * 400);
+                            const response = await askAI(suggestion, history);
+                            setAiMessages(prev => [...prev, { id: Date.now() + 1, role: 'ai', content: response }]);
+                            setAiTyping(false);
                           }}
                           className="px-3 py-1.5 text-[10px] font-medium bg-surface-secondary text-ink-secondary rounded-xl hover:bg-surface-tertiary hover:text-ink transition-all border border-gray-200 active:scale-[0.97]"
                         >

@@ -27,6 +27,7 @@ from session.session_recommender import (
     SessionRecommender, CoOccurrenceMatrix, SequenceBasedRecommender,
     SessionConfig, build_sessions_from_views,
 )
+from rag.knowledge_base import KnowledgeBase
 from evaluation.metrics import (
     RecommendationMetrics, ABTestFramework, EvaluationResult,
     train_test_split_by_time, build_relevant_set,
@@ -148,6 +149,23 @@ class HealthResponse(BaseModel):
     version: str
 
 
+# --- RAG Models ---
+class RAGAskRequest(BaseModel):
+    question: str
+    user_context: Optional[Dict[str, Any]] = None
+    n_results: Optional[int] = 5
+
+class RAGChatRequest(BaseModel):
+    messages: List[Dict[str, str]]
+    user_context: Optional[Dict[str, Any]] = None
+
+class RAGBuildRequest(BaseModel):
+    db_url: Optional[str] = None
+    force: Optional[bool] = False
+    products: Optional[List[Dict[str, Any]]] = None
+    categories: Optional[List[Dict[str, Any]]] = None
+
+
 # ============================================================
 # Singleton instances
 # ============================================================
@@ -159,6 +177,27 @@ als_model = None
 hybrid = None
 session_rec = None
 ab_test = None
+rag_service_instance = None
+kb_instance = None
+
+
+def get_knowledge_base():
+    """Lazy init Knowledge Base"""
+    global kb_instance
+    if kb_instance is None:
+        from rag.knowledge_base import KnowledgeBase
+        kb_instance = KnowledgeBase()
+    return kb_instance
+
+
+def get_rag_service():
+    """Lazy init RAG Service"""
+    global rag_service_instance, kb_instance
+    if rag_service_instance is None:
+        from rag.rag_service import RAGService
+        kb = get_knowledge_base()
+        rag_service_instance = RAGService(knowledge_base=kb)
+    return rag_service_instance
 
 
 def get_pipeline(n_clusters: int = 4) -> ClusteringPipeline:
@@ -270,8 +309,154 @@ async def service_info():
                     "/abtest/compare", "/abtest/reset",
                 ],
             },
+            "rag": {
+                "description": "RAG Chat AI — Knowledge Base + Ollama",
+                "endpoints": ["/rag/ask", "/rag/chat", "/rag/build", "/rag/status"],
+            },
         },
     }
+
+
+# ============================================================
+# RAG (Retrieval-Augmented Generation) Endpoints
+# ============================================================
+
+@app.post("/rag/ask")
+async def rag_ask(request: RAGAskRequest):
+    """
+    Hỏi AI Chatbot dựa trên knowledge base.
+    
+    Sử dụng RAG pipeline:
+    1. Tìm kiếm documents liên quan trong knowledge base
+    2. Xây dựng prompt với context
+    3. Gọi Ollama local để sinh câu trả lời
+    """
+    try:
+        rag = get_rag_service()
+        result = rag.ask(
+            question=request.question,
+            user_context=request.user_context,
+            n_results=request.n_results or 5,
+        )
+        return {"success": True, "data": result}
+    except Exception as e:
+        logger.error(f"RAG ask failed: {str(e)}")
+        return {
+            "success": True,
+            "data": {
+                "answer": rag_service_instance._fallback_response(request.question) if rag_service_instance else "Xin lỗi, tạm thời tôi chưa thể trả lời.",
+                "sources": [],
+                "kb_docs_used": 0,
+            },
+        }
+
+
+@app.post("/rag/chat")
+async def rag_chat(request: RAGChatRequest):
+    """
+    Chat với AI có lịch sử hội thoại.
+    """
+    try:
+        rag = get_rag_service()
+        answer = rag.chat(
+            messages=request.messages,
+            user_context=request.user_context,
+        )
+        return {"success": True, "data": {"answer": answer}}
+    except Exception as e:
+        logger.error(f"RAG chat failed: {str(e)}")
+        return {
+            "success": True,
+            "data": {
+                "answer": "Xin lỗi, tôi đang gặp sự cố kết nối. Vui lòng thử lại sau.",
+            },
+        }
+
+
+@app.post("/rag/build")
+async def rag_build(request: RAGBuildRequest):
+    """
+    Xây dựng/đồng bộ knowledge base.
+    
+    Có thể gửi dữ liệu products + categories trực tiếp,
+    hoặc để service tự fetch từ database (cần db_url).
+    """
+    try:
+        kb = get_knowledge_base()
+
+        if request.force:
+            kb.clear()
+
+        # Nếu có dữ liệu gửi lên thì dùng
+        if request.products or request.categories:
+            docs = []
+            if request.products:
+                docs += KnowledgeBase.build_product_documents(request.products)
+            if request.categories:
+                docs += KnowledgeBase.build_category_documents(request.categories)
+            # Thêm policies + FAQ + guides
+            docs += KnowledgeBase.build_policy_documents()
+            docs += KnowledgeBase.build_faq_documents()
+            docs += KnowledgeBase.build_guide_documents()
+            kb.add_documents(docs)
+        else:
+            # Tự fetch từ database
+            db_url = request.db_url or os.getenv(
+                "DATABASE_URL",
+                "postgresql://khoaluan:khoaluan123@localhost:5432/khoaluan"
+            )
+            from rag.build_kb import build_kb as run_build
+            run_build(force=request.force, db_url=db_url)
+            # Reload KB
+            global kb_instance
+            kb_instance = None
+            kb = get_knowledge_base()
+
+        stats = kb.get_stats()
+        return {"success": True, "data": stats}
+    except Exception as e:
+        logger.error(f"RAG build failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/rag/status")
+async def rag_status():
+    """Trạng thái knowledge base"""
+    try:
+        kb = get_knowledge_base()
+        stats = kb.get_stats()
+
+        # Kiểm tra Ollama
+        ollama_ok = False
+        try:
+            import requests
+            resp = requests.get(
+                f"{os.getenv('OLLAMA_HOST', 'http://localhost:11434')}/api/tags",
+                timeout=3
+            )
+            ollama_ok = resp.status_code == 200
+        except:
+            pass
+
+        return {
+            "success": True,
+            "data": {
+                "knowledge_base": stats,
+                "ollama_connected": ollama_ok,
+                "ollama_host": os.getenv("OLLAMA_HOST", "http://localhost:11434"),
+                "ollama_model": os.getenv("OLLAMA_MODEL", "llama3.2:3b"),
+            },
+        }
+    except Exception as e:
+        logger.error(f"RAG status failed: {str(e)}")
+        return {
+            "success": True,
+            "data": {
+                "knowledge_base": {"total": 0, "by_type": {}},
+                "ollama_connected": False,
+                "error": str(e),
+            },
+        }
 
 
 # ============================================================

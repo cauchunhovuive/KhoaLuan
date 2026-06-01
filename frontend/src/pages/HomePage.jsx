@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import {
   FiArrowRight, FiTrendingUp, FiUsers, FiShoppingBag, FiAward,
   FiZap, FiStar, FiChevronRight, FiShield, FiClock, FiHeart,
-  FiLayers,
+  FiLayers, FiSun, FiTag, FiMapPin,
 } from 'react-icons/fi';
 import { fetchFeaturedProducts, fetchCategories } from '../store/productSlice';
 import ProductCard from '../components/common/ProductCard';
@@ -144,6 +144,60 @@ const HomePage = () => {
       .finally(() => setTrendingLoading(false));
   }, []);
 
+  // Seasonal/Event recommendations with filter pills
+  const [seasonalRecs, setSeasonalRecs] = useState([]);
+  const [seasonalLoading, setSeasonalLoading] = useState(false);
+  const [seasonalFilter, setSeasonalFilter] = useState('trending');
+
+  const fetchSeasonalRecs = useCallback(async (filter) => {
+    setSeasonalLoading(true);
+    try {
+      let params = { limit: 8 };
+      switch (filter) {
+        case 'newest':
+          params.sort = '-createdAt';
+          break;
+        case 'bestselling':
+          params.sort = 'sold';
+          break;
+        case 'toprated':
+          params.sort = 'rating';
+          break;
+        case 'ai':
+          // Use AI recommendations endpoint
+          const { data: aiData } = await api.get('/recommendations/trending');
+          setSeasonalRecs((aiData.data?.products || aiData.data || []).slice(0, 8));
+          return;
+        case 'trending':
+        default:
+          // Seasonal/trending: mix trending + best-selling
+          const [trendingRes, catRes] = await Promise.all([
+            api.get('/recommendations/trending'),
+            api.get('/products', { params: { sort: 'sold', limit: 8 } }),
+          ]);
+          const trending = trendingRes.data?.data?.products || trendingRes.data?.data || trendingRes.data || [];
+          const bestSellers = catRes.data?.data?.products || [];
+          // Merge trending + bestsellers, deduplicate by id
+          const merged = [...(Array.isArray(trending) ? trending : []), ...bestSellers];
+          const seen = new Set();
+          const deduped = merged.filter(p => { if (seen.has(p.id)) return false; seen.add(p.id); return true; });
+          setSeasonalRecs(deduped.slice(0, 8));
+          return;
+      }
+      const { data } = await api.get('/products', { params });
+      setSeasonalRecs(data.data?.products || []);
+    } catch {
+      // Fallback to featured
+      setSeasonalRecs(featuredProducts.slice(0, 8));
+    } finally {
+      setSeasonalLoading(false);
+    }
+  }, [featuredProducts]);
+
+  useEffect(() => {
+    fetchSeasonalRecs(seasonalFilter);
+  }, [seasonalFilter, fetchSeasonalRecs]);
+
   // Check ML health
   useEffect(() => {
     api.get('/ml/health')
@@ -209,6 +263,106 @@ const HomePage = () => {
           ))}
         </div>
       </div>
+
+      {/* ═══════════════ SEASONAL / EVENT RECOMMENDATIONS ═══════════════ */}
+      {(seasonalRecs.length > 0 || seasonalLoading) && (
+        <LazySection placeholder={<div className="section-padding" />}>
+        <RevealSection
+          className="section-padding relative overflow-hidden"
+          delay={50}
+        >
+          {/* Ambient seasonal gradient */}
+          <div className="absolute inset-0 bg-gradient-to-b from-emerald-50/60 via-white to-amber-50/40" />
+          <div className="absolute top-0 right-0 w-[400px] h-[400px] rounded-full bg-emerald-500/5 blur-[100px]" />
+          <div className="absolute bottom-0 left-0 w-[300px] h-[300px] rounded-full bg-amber-500/5 blur-[80px]" />
+
+          <div className="relative section-container">
+            <SectionHeader
+              badge={
+                <span className="flex items-center">
+                  <FiSun className="mr-1.5" /> Gợi ý theo mùa
+                </span>
+              }
+              title={
+                <span>
+                  Sản phẩm <span className="text-emerald-600">nổi bật theo mùa</span>
+                </span>
+              }
+              subtitle="Dựa trên xu hướng thị trường và phân tích AI, chúng tôi gợi ý những sản phẩm phù hợp nhất cho thời điểm này."
+              action={{ to: '/products?sort=sold', label: 'Khám phá thêm' }}
+            />
+
+            {seasonalLoading ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                  <div key={i} className="skeleton-card" />
+                ))}
+              </div>
+            ) : (
+              <>
+                {/* Season pills — clickable filter */}
+                <div className="flex items-center flex-wrap gap-2 mb-8 justify-center">
+                  {[
+                    { key: 'trending', label: 'Mùa hè', icon: FiSun, color: 'text-amber-500' },
+                    { key: 'newest', label: 'Mới nhất', icon: FiClock, color: 'text-emerald-500' },
+                    { key: 'bestselling', label: 'Bán chạy', icon: FiTrendingUp, color: 'text-red-500' },
+                    { key: 'toprated', label: 'Đánh giá cao', icon: FiStar, color: 'text-primary-500' },
+                  ].map((pill) => (
+                    <button
+                      key={pill.key}
+                      onClick={() => setSeasonalFilter(pill.key)}
+                      className={`inline-flex items-center px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-200 active:scale-[0.97] ${
+                        seasonalFilter === pill.key
+                          ? 'bg-emerald-600 text-white shadow-premium-sm ring-1 ring-emerald-400'
+                          : 'bg-white border border-gray-200 text-ink-secondary hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700 shadow-sm'
+                      }`}
+                    >
+                      <pill.icon className={`mr-1.5 text-[10px] ${
+                        seasonalFilter === pill.key ? 'text-white' : pill.color
+                      }`} />
+                      {pill.label}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setSeasonalFilter('ai')}
+                    className={`inline-flex items-center px-3 py-1.5 rounded-full text-[10px] font-bold transition-all duration-200 active:scale-[0.97] ${
+                      seasonalFilter === 'ai'
+                        ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-premium-sm ring-1 ring-violet-400'
+                        : 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-premium-sm hover:from-emerald-600 hover:to-emerald-700'
+                    }`}
+                  >
+                    <FiZap className="mr-1" />
+                    AI Đề xuất
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 stagger-fade">
+                  {seasonalRecs.slice(0, 8).map((product, idx) => (
+                    <ProductCard key={product.id} product={product} index={idx} />
+                  ))}
+                </div>
+
+                {/* Seasonal trend badges */}
+                <div className="flex items-center justify-center mt-8 space-x-6 text-xs text-ink-tertiary">
+                  <div className="flex items-center space-x-1.5">
+                    <FiTrendingUp className="text-emerald-500" />
+                    <span>Phân tích xu hướng AI</span>
+                  </div>
+                  <div className="flex items-center space-x-1.5">
+                    <FiClock className="text-amber-500" />
+                    <span>Cập nhật theo thời gian thực</span>
+                  </div>
+                  <div className="flex items-center space-x-1.5">
+                    <FiMapPin className="text-primary-500" />
+                    <span>Phù hợp thị trường Việt Nam</span>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </RevealSection>
+        </LazySection>
+      )}
 
       {/* ═══════════════ ML RECOMMENDATIONS ═══════════════ */}
       {isAuthenticated && (personalizedRecs.length > 0 || recsLoading) && (

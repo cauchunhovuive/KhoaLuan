@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   FiUser, FiMail, FiPhone, FiMapPin, FiSave, FiCamera, FiArrowRight, FiLock,
   FiHeart, FiKey, FiCheck, FiZap, FiShield, FiClock, FiExternalLink,
+  FiShoppingBag, FiHome, FiBriefcase, FiEdit2, FiTrash2,
 } from 'react-icons/fi';
 import { updateProfile } from '../store/authSlice';
 import api from '../services/api';
@@ -53,6 +54,10 @@ const ProfilePage = () => {
   // Order stats
   const [orderStats, setOrderStats] = useState({ total: 0, completed: 0, cancelled: 0 });
 
+  // Avatar upload
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const fileInputRef = useRef(null);
+
   useEffect(() => {
     if (user) {
       setFormData({ name: user.name || '', phone: user.phone || '', address: user.address || '' });
@@ -66,19 +71,54 @@ const ProfilePage = () => {
 
   // Fetch order stats on mount
   useEffect(() => {
-    api.get('/orders/my?limit=1').then(({ data }) => {
-      const pag = data.data?.pagination || {};
-      setOrderStats({ total: pag.total || 0, completed: 0, cancelled: 0 });
-    }).catch(() => {});
-    api.get('/orders/my?limit=100').then(({ data }) => {
-      const orders = data.data?.orders || [];
-      setOrderStats({
-        total: orders.length,
-        completed: orders.filter(o => o.status === 'DELIVERED').length,
-        cancelled: orders.filter(o => o.status === 'CANCELLED').length,
-      });
-    }).catch(() => {});
+    const fetchStats = async () => {
+      try {
+        const { data } = await api.get('/orders?limit=200');
+        const orders = data.data?.orders || [];
+        const pagination = data.data?.pagination || {};
+        setOrderStats({
+          total: pagination.total || orders.length,
+          completed: orders.filter(o => o.status === 'DELIVERED').length,
+          cancelled: orders.filter(o => o.status === 'CANCELLED').length,
+        });
+      } catch {}
+    };
+    fetchStats();
   }, []);
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type and size
+    if (!file.type.startsWith('image/')) {
+      toast.error('Chỉ chấp nhận file ảnh');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Ảnh không được quá 2MB');
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => resolve(ev.target?.result);
+        reader.onerror = () => reject(new Error('Đọc file thất bại'));
+        reader.readAsDataURL(file);
+      });
+      if (typeof base64 === 'string') {
+        await dispatch(updateProfile({ avatar: base64 })).unwrap();
+        toast.success('Cập nhật ảnh đại diện thành công');
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Cập nhật ảnh thất bại');
+    } finally {
+      setUploadingAvatar(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   const fetchAddresses = async () => {
     setLoadingAddresses(true);
@@ -225,8 +265,14 @@ const ProfilePage = () => {
                   <div className="w-20 h-20 bg-gradient-to-br from-primary-100 to-primary-50 rounded-3xl flex items-center justify-center ring-2 ring-primary-200/50 shadow-premium-sm">
                     <span className="text-3xl font-bold text-primary-600">{user?.name?.[0] || 'U'}</span>
                   </div>
-                  <button className="absolute bottom-0 -right-1 bg-primary-600 text-white p-2 rounded-xl hover:bg-primary-700 active:scale-90 transition-all duration-200 shadow-premium-md">
-                    <FiCamera size={14} />
+                  <input type="file" ref={fileInputRef} onChange={handleAvatarChange} accept="image/*" className="hidden" />
+                  <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadingAvatar}
+                    className="absolute bottom-0 -right-1 bg-primary-600 text-white p-2 rounded-xl hover:bg-primary-700 active:scale-90 transition-all duration-200 shadow-premium-md disabled:opacity-50">
+                    {uploadingAvatar ? (
+                      <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <FiCamera size={14} />
+                    )}
                   </button>
                 </div>
                 <div>
