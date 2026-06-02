@@ -3,6 +3,34 @@ const AppError = require('../utils/AppError');
 const asyncHandler = require('../utils/asyncHandler');
 const { applyCouponToOrder } = require('./couponController');
 
+// ─── Helper: get active flash sale prices for a list of product IDs ───
+const getFlashSalePrices = async (productIds) => {
+  if (!productIds.length) return {};
+  const now = new Date();
+  const flashProducts = await prisma.flashSaleProduct.findMany({
+    where: {
+      productId: { in: productIds },
+      flashSale: {
+        isActive: true,
+        startTime: { lte: now },
+        endTime: { gte: now },
+      },
+    },
+    select: {
+      id: true,
+      productId: true,
+      salePrice: true,
+      maxQuantity: true,
+      soldCount: true,
+      flashSale: { select: { id: true, title: true } },
+    },
+  });
+  return flashProducts.reduce((map, fp) => {
+    map[fp.productId] = fp;
+    return map;
+  }, {});
+};
+
 // @desc    Create order from cart
 // @route   POST /api/orders
 const createOrder = asyncHandler(async (req, res) => {
@@ -18,15 +46,36 @@ const createOrder = asyncHandler(async (req, res) => {
     throw new AppError('Giỏ hàng trống', 400);
   }
 
-  // Check stock
+  // ── Lấy giá flash sale cho tất cả sản phẩm trong giỏ ──
+  const productIds = cartItems.map((i) => i.productId);
+  const flashPrices = await getFlashSalePrices(productIds);
+
+  // ── Kiểm tra stock + flash sale ──
   for (const item of cartItems) {
     if (item.quantity > item.product.stock) {
       throw new AppError(`Sản phẩm "${item.product.name}" không đủ hàng`, 400);
     }
+
+    const flashInfo = flashPrices[item.productId];
+    if (flashInfo && flashInfo.maxQuantity > 0) {
+      const remaining = flashInfo.maxQuantity - flashInfo.soldCount;
+      if (item.quantity > remaining) {
+        throw new AppError(
+          `Sản phẩm "${item.product.name}" chỉ còn ${remaining} suất flash sale`,
+          400
+        );
+      }
+    }
   }
 
+  // ── Tính subtotal — dùng flash sale price nếu có ──
+  const getEffectivePrice = (item) => {
+    const flashInfo = flashPrices[item.productId];
+    return flashInfo ? flashInfo.salePrice : (item.product.discountPrice || item.product.price);
+  };
+
   const subtotal = cartItems.reduce(
-    (sum, item) => sum + (item.product.discountPrice || item.product.price) * item.quantity,
+    (sum, item) => sum + getEffectivePrice(item) * item.quantity,
     0
   );
   const shippingFee = subtotal >= 500000 ? 0 : 30000;
@@ -47,7 +96,7 @@ const createOrder = asyncHandler(async (req, res) => {
   const finalAmount = Math.max(0, subtotal + shippingFee - discountAmount);
 
   const order = await prisma.$transaction(async (tx) => {
-    // Create order
+    // Create order — dùng flash sale price
     const newOrder = await tx.order.create({
       data: {
         userId,
@@ -64,7 +113,7 @@ const createOrder = asyncHandler(async (req, res) => {
           create: cartItems.map((item) => ({
             productId: item.productId,
             quantity: item.quantity,
-            price: item.product.discountPrice || item.product.price,
+            price: getEffectivePrice(item),
           })),
         },
       },
@@ -80,6 +129,15 @@ const createOrder = asyncHandler(async (req, res) => {
           soldCount: { increment: item.quantity },
         },
       });
+
+      // ── Update flash sale soldCount ──
+      const flashInfo = flashPrices[item.productId];
+      if (flashInfo) {
+        await tx.flashSaleProduct.update({
+          where: { id: flashInfo.id },
+          data: { soldCount: { increment: item.quantity } },
+        });
+      }
     }
 
     // Clear cart

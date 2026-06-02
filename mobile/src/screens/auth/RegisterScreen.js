@@ -1,69 +1,83 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { useDispatch } from 'react-redux';
+import {
+  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  Alert, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView,
+} from 'react-native';
+import { useDispatch, useSelector } from 'react-redux';
+import { register } from '../../store/authSlice';
 
 const RegisterScreen = ({ navigation }) => {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [phone, setPhone] = useState('');
+  const [form, setForm] = useState({ name: '', email: '', password: '', phone: '' });
   const dispatch = useDispatch();
+  const { loading } = useSelector((state) => state.auth);
+
+  const updateField = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
 
   const handleRegister = async () => {
-    if (!name || !email || !password) {
+    if (!form.name.trim() || !form.email.trim() || !form.password) {
       Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ thông tin');
       return;
     }
-    // TODO: Implement register API call
-    dispatch({ type: 'SET_LOADING', payload: true });
-    try {
-      // const { data } = await api.post('/auth/register', { name, email, password, phone });
-      // dispatch({ type: 'LOGIN_SUCCESS', payload: data.data });
-    } catch (error) {
-      Alert.alert('Lỗi', error.response?.data?.message || 'Đăng ký thất bại');
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
+    if (form.password.length < 6) {
+      Alert.alert('Lỗi', 'Mật khẩu phải có ít nhất 6 ký tự');
+      return;
+    }
+    const result = await dispatch(register(form));
+    if (register.rejected.match(result)) {
+      Alert.alert('Đăng ký thất bại', result.payload || 'Vui lòng thử lại');
     }
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Đăng ký</Text>
-        <Text style={styles.subtitle}>Tạo tài khoản mới</Text>
-      </View>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <View style={styles.header}>
+          <Text style={styles.logo}>🛍️</Text>
+          <Text style={styles.title}>Đăng ký</Text>
+          <Text style={styles.subtitle}>Tạo tài khoản mới</Text>
+        </View>
 
-      <View style={styles.form}>
-        <TextInput style={styles.input} placeholder="Họ tên" value={name} onChangeText={setName} />
-        <TextInput style={styles.input} placeholder="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
-        <TextInput style={styles.input} placeholder="Số điện thoại" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
-        <TextInput style={styles.input} placeholder="Mật khẩu" value={password} onChangeText={setPassword} secureTextEntry />
+        <View style={styles.form}>
+          <Text style={styles.label}>Họ tên *</Text>
+          <TextInput style={styles.input} placeholder="Nguyễn Văn A" value={form.name} onChangeText={(t) => updateField('name', t)} />
 
-        <TouchableOpacity style={styles.button} onPress={handleRegister}>
-          <Text style={styles.buttonText}>Đăng ký</Text>
-        </TouchableOpacity>
+          <Text style={styles.label}>Email *</Text>
+          <TextInput style={styles.input} placeholder="nhap@email.com" value={form.email} onChangeText={(t) => updateField('email', t)} keyboardType="email-address" autoCapitalize="none" />
 
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.linkText}>
-            Đã có tài khoản? <Text style={styles.linkHighlight}>Đăng nhập</Text>
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+          <Text style={styles.label}>Số điện thoại</Text>
+          <TextInput style={styles.input} placeholder="0123 456 789" value={form.phone} onChangeText={(t) => updateField('phone', t)} keyboardType="phone-pad" />
+
+          <Text style={styles.label}>Mật khẩu *</Text>
+          <TextInput style={styles.input} placeholder="••••••••" value={form.password} onChangeText={(t) => updateField('password', t)} secureTextEntry />
+
+          <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Đăng ký</Text>}
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.linkWrap}>
+            <Text style={styles.linkText}>Đã có tài khoản? <Text style={styles.linkHighlight}>Đăng nhập</Text></Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC', justifyContent: 'center', padding: 24 },
-  header: { alignItems: 'center', marginBottom: 32 },
-  title: { fontSize: 28, fontWeight: 'bold', color: '#1E293B', marginBottom: 8 },
-  subtitle: { fontSize: 16, color: '#64748B' },
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  scroll: { flexGrow: 1, justifyContent: 'center', padding: 24 },
+  header: { alignItems: 'center', marginBottom: 36 },
+  logo: { fontSize: 48, marginBottom: 8 },
+  title: { fontSize: 28, fontWeight: 'bold', color: '#1e293b' },
+  subtitle: { fontSize: 15, color: '#64748b', marginTop: 4 },
   form: { width: '100%' },
-  input: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, padding: 16, fontSize: 16, marginBottom: 16 },
-  button: { backgroundColor: '#3B82F6', borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 16 },
-  buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
-  linkText: { textAlign: 'center', color: '#64748B', fontSize: 14 },
-  linkHighlight: { color: '#3B82F6', fontWeight: '600' },
+  label: { fontSize: 14, fontWeight: '600', color: '#1e293b', marginBottom: 6, marginTop: 8 },
+  input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, padding: 14, fontSize: 16 },
+  button: { backgroundColor: '#3b82f6', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 24 },
+  buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  linkWrap: { marginTop: 20, alignItems: 'center' },
+  linkText: { color: '#64748b', fontSize: 14 },
+  linkHighlight: { color: '#3b82f6', fontWeight: '600' },
 });
 
 export default RegisterScreen;

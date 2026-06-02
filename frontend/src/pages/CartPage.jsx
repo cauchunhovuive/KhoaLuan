@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   FiTrash2, FiMinus, FiPlus, FiShoppingBag, FiArrowLeft, FiChevronRight,
-  FiShield, FiTruck, FiCheck,
+  FiShield, FiTruck, FiCheck, FiZap,
 } from 'react-icons/fi';
 import { fetchCart, updateCartItem, removeFromCart } from '../store/cartSlice';
 import LazyImage from '../components/common/LazyImage';
@@ -141,8 +141,9 @@ const CartPage = () => {
             {/* ═══ Cart Items ═══ */}
             <div className="lg:col-span-2 space-y-3">
               {items.map((item, index) => {
-                const unitPrice = item.product.discountPrice || item.product.price;
+                const unitPrice = item.effectivePrice || item.product.discountPrice || item.product.price;
                 const lineTotal = unitPrice * item.quantity;
+                const hasFlashSale = !!item.flashSale;
                 return (
                   <div
                     key={item.product.id}
@@ -179,14 +180,27 @@ const CartPage = () => {
                             {item.product.name}
                           </Link>
                           <div className="flex items-center space-x-2 mt-1.5">
+                            <div className="flex items-center flex-wrap gap-x-2">
+                            {hasFlashSale && (
+                              <span className="inline-flex items-center space-x-0.5 text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded-md font-semibold">
+                                <FiZap size={10} />
+                                <span>Flash</span>
+                              </span>
+                            )}
                             <span className="text-lg font-bold text-primary-600">
                               {unitPrice.toLocaleString('vi-VN')}₫
                             </span>
-                            {item.product.discountPrice && (
+                            {item.product.discountPrice && !hasFlashSale && (
                               <span className="text-xs text-ink-tertiary line-through">
                                 {item.product.price.toLocaleString('vi-VN')}₫
                               </span>
                             )}
+                            {hasFlashSale && (
+                              <span className="text-xs text-ink-tertiary line-through">
+                                {(item.product.discountPrice || item.product.price).toLocaleString('vi-VN')}₫
+                              </span>
+                            )}
+                          </div>
                           </div>
                           <p className="text-xs text-ink-tertiary mt-0.5">
                             Thành tiền: <span className="font-semibold text-ink">{lineTotal.toLocaleString('vi-VN')}₫</span>

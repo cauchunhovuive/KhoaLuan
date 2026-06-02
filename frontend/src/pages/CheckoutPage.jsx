@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import {
   FiMapPin, FiPhone, FiFileText, FiCreditCard, FiTruck, FiTag, FiX, FiCheck,
   FiChevronDown, FiHome, FiBriefcase, FiStar, FiShield, FiDollarSign,
-  FiSmartphone, FiArrowRight, FiRotateCcw,
+  FiSmartphone, FiArrowRight, FiRotateCcw, FiZap,
 } from 'react-icons/fi';
 import api from '../services/api';
 import toast from 'react-hot-toast';
@@ -464,7 +464,8 @@ const CheckoutPage = () => {
                   {/* Order items */}
                   <div className="space-y-3 mb-6 max-h-[280px] overflow-y-auto pr-1">
                     {items.map((item, idx) => {
-                      const unitPrice = item.product.discountPrice || item.product.price;
+                      const unitPrice = item.effectivePrice || item.product.discountPrice || item.product.price;
+                      const hasFlashSale = !!item.flashSale;
                       return (
                         <div
                           key={item.product.id}
@@ -488,12 +489,25 @@ const CheckoutPage = () => {
                             </div>
                             <div className="min-w-0">
                               <p className="text-ink truncate text-xs font-medium">{item.product.name}</p>
+                              {hasFlashSale && (
+                                <span className="inline-flex items-center space-x-0.5 text-[9px] bg-red-50 text-red-600 px-1 py-0.5 rounded mt-0.5 font-semibold">
+                                  <FiZap size={8} />
+                                  <span>Flash Sale</span>
+                                </span>
+                              )}
                               <p className="text-ink-tertiary text-[10px] mt-0.5">x{item.quantity}</p>
                             </div>
                           </div>
-                          <span className="font-medium text-ink text-xs ml-2 shrink-0">
-                            {(unitPrice * item.quantity).toLocaleString('vi-VN')}₫
-                          </span>
+                          <div className="text-right shrink-0 ml-2">
+                            <span className="font-medium text-ink text-xs block">
+                              {(unitPrice * item.quantity).toLocaleString('vi-VN')}₫
+                            </span>
+                            {hasFlashSale && (
+                              <span className="text-[10px] text-ink-tertiary line-through block mt-0.5">
+                                {(item.product.discountPrice || item.product.price).toLocaleString('vi-VN')}₫
+                              </span>
+                            )}
+                          </div>
                         </div>
                       );
                     })}

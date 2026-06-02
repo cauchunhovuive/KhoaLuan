@@ -70,7 +70,7 @@ const cartSlice = createSlice({
         state.items = state.items.filter((item) => item.product.id !== action.payload);
         state.count = state.items.length;
         state.total = state.items.reduce((sum, item) => {
-          const price = item.product.discountPrice || item.product.price;
+          const price = item.effectivePrice || item.product.discountPrice || item.product.price;
           return sum + price * item.quantity;
         }, 0);
       })
@@ -78,7 +78,7 @@ const cartSlice = createSlice({
         const item = state.items.find((i) => i.product.id === action.payload.productId);
         if (item) item.quantity = action.payload.quantity;
         state.total = state.items.reduce((sum, item) => {
-          const price = item.product.discountPrice || item.product.price;
+          const price = item.effectivePrice || item.product.discountPrice || item.product.price;
           return sum + price * item.quantity;
         }, 0);
       });

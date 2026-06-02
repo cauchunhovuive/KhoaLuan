@@ -2,6 +2,33 @@ const { prisma } = require('../config/database');
 const AppError = require('../utils/AppError');
 const asyncHandler = require('../utils/asyncHandler');
 
+// ─── Helper: get active flash sale prices for a list of product IDs ───
+const getFlashSalePrices = async (productIds) => {
+  if (!productIds.length) return {};
+  const now = new Date();
+  const flashProducts = await prisma.flashSaleProduct.findMany({
+    where: {
+      productId: { in: productIds },
+      flashSale: {
+        isActive: true,
+        startTime: { lte: now },
+        endTime: { gte: now },
+      },
+    },
+    select: {
+      productId: true,
+      salePrice: true,
+      maxQuantity: true,
+      soldCount: true,
+      flashSale: { select: { id: true, title: true } },
+    },
+  });
+  return flashProducts.reduce((map, fp) => {
+    map[fp.productId] = fp;
+    return map;
+  }, {});
+};
+
 // @desc    Get cart items
 // @route   GET /api/cart
 const getCart = asyncHandler(async (req, res) => {
@@ -23,12 +50,33 @@ const getCart = asyncHandler(async (req, res) => {
     },
   });
 
-  const total = items.reduce((sum, item) => {
-    const price = item.product.discountPrice || item.product.price;
-    return sum + price * item.quantity;
-  }, 0);
+  // Lấy giá flash sale nếu có
+  const productIds = items.map((i) => i.productId);
+  const flashPrices = await getFlashSalePrices(productIds);
 
-  res.json({ success: true, data: { items, total, count: items.length } });
+  // Gắn flash sale info vào từng item + tính total
+  let total = 0;
+  const enrichedItems = items.map((item) => {
+    const flashInfo = flashPrices[item.productId];
+    const effectivePrice = flashInfo ? flashInfo.salePrice : (item.product.discountPrice || item.product.price);
+    total += effectivePrice * item.quantity;
+
+    return {
+      ...item,
+      effectivePrice,
+      flashSale: flashInfo
+        ? {
+            id: flashInfo.flashSale.id,
+            title: flashInfo.flashSale.title,
+            salePrice: flashInfo.salePrice,
+            maxQuantity: flashInfo.maxQuantity,
+            soldCount: flashInfo.soldCount,
+          }
+        : null,
+    };
+  });
+
+  res.json({ success: true, data: { items: enrichedItems, total, count: items.length } });
 });
 
 // @desc    Add to cart
