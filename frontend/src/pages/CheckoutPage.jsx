@@ -167,12 +167,47 @@ const CheckoutPage = () => {
     }
     setLoading(true);
     try {
+      // 1. Tạo đơn hàng
       const { data } = await api.post('/orders', {
         ...formData,
         couponCode: appliedCoupon?.code || null,
       });
-      toast.success('Đặt hàng thành công!');
-      navigate(`/orders/${data.data.id}`);
+
+      const orderId = data.data.id;
+
+      // 2. Xử lý thanh toán theo phương thức
+      const paymentMethod = formData.paymentMethod;
+
+      if (paymentMethod === 'COD') {
+        // Thanh toán khi nhận hàng — chuyển thẳng tới order detail
+        toast.success('Đặt hàng thành công!');
+        navigate(`/orders/${orderId}`);
+
+      } else if (paymentMethod === 'VNPAY') {
+        // Tạo URL thanh toán VNPay và redirect
+        const { data: vnpayData } = await api.post('/payments/vnpay/create', { orderId });
+        if (vnpayData.success && vnpayData.data?.paymentUrl) {
+          window.location.href = vnpayData.data.paymentUrl;
+        } else {
+          toast.error('Không thể tạo URL thanh toán VNPay');
+          navigate(`/orders/${orderId}`);
+        }
+
+      } else if (paymentMethod === 'MOMO') {
+        // Tạo thanh toán MoMo và redirect
+        const { data: momoData } = await api.post('/payments/momo/create', { orderId });
+        if (momoData.success && momoData.data?.payUrl) {
+          window.location.href = momoData.data.payUrl;
+        } else {
+          toast.error('Không thể tạo thanh toán MoMo');
+          navigate(`/orders/${orderId}`);
+        }
+
+      } else if (paymentMethod === 'BANKING') {
+        // Chuyển khoản ngân hàng — hiển thị thông tin tài khoản
+        toast.success('Đặt hàng thành công! Vui lòng chuyển khoản theo thông tin bên dưới.');
+        navigate(`/orders/${orderId}?payment=pending`);
+      }
     } catch (error) {
       toast.error(error.response?.data?.message || 'Đặt hàng thất bại');
     } finally {

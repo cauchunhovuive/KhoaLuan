@@ -24,5 +24,6 @@ router.use('/violations', require('./violations'));
 router.use('/audit', require('./audit'));
 router.use('/shops', require('./shops'));
 router.use('/ml', require('./ml'));
+router.use('/payments', require('./payments'));
 
 module.exports = router;

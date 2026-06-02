@@ -139,6 +139,9 @@ model Order {
   phone          String
   note           String?
   couponId       String?
+  transactionId  String?                               // Mã giao dịch từ VNPay/MoMo
+  transactionNo  String?                               // Mã tham chiếu từ cổng thanh toán
+  paidAt         DateTime?                             // Thời gian thanh toán
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 

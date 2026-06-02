@@ -24,6 +24,7 @@ import FollowedShopsPage from './pages/FollowedShopsPage';
 import ShopPage from './pages/ShopPage';
 import FlashSalePage from './pages/FlashSalePage';
 import UserCouponsPage from './pages/CouponsPage';
+import PaymentResultPage from './pages/PaymentResultPage';
 
 // Partner Layout (needed at module level)
 import PartnerLayout from './components/Layout/PartnerLayout';
@@ -130,6 +131,7 @@ function App() {
         <Route path="coupons" element={
           <ProtectedRoute><UserCouponsPage /></ProtectedRoute>
         } />
+        <Route path="payment/result" element={<PaymentResultPage />} />
         <Route path="shop/:partnerId" element={<ShopPage />} />
       </Route>
 
