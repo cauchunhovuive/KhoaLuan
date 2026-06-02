@@ -11,4 +11,4 @@ pydantic==2.5.3
 # RAG + AI Chat
 chromadb==0.5.0
 sentence-transformers==3.0.1
-requests==2.31.1
+requests>=2.31

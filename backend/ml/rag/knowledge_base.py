@@ -3,16 +3,15 @@ Knowledge Base — ChromaDB vector store cho RAG
 
 Lưu trữ embeddings của sản phẩm, danh mục, chính sách và hướng dẫn sử dụng web.
 Dùng sentence-transformers để tạo embeddings (chạy local, không cần API key).
+
+Note: ChromaDB imports are LAZY (inside __init__) để tránh crash toàn bộ ML service
+nếu chromadb chưa được cài đặt.
 """
 
 import os
 import logging
 from typing import List, Dict, Optional
 from datetime import datetime
-
-import chromadb
-from chromadb.config import Settings
-from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
 
@@ -23,16 +22,30 @@ KB_PERSIST_DIR = os.getenv("KB_PERSIST_DIR", os.path.join(os.path.dirname(__file
 
 
 class EmbeddingFunction:
-    """Wrapper để ChromaDB dùng sentence-transformers"""
+    """Wrapper để ChromaDB dùng sentence-transformers (LAZY import)"""
 
     def __init__(self, model_name: str = EMBEDDING_MODEL):
         logger.info(f"Loading embedding model: {model_name}")
-        self.model = SentenceTransformer(model_name)
-        self.dimension = self.model.get_sentence_embedding_dimension()
-        logger.info(f"Embedding dimension: {self.dimension}")
+        try:
+            from sentence_transformers import SentenceTransformer
+            self.model = SentenceTransformer(model_name)
+            self.dimension = self.model.get_sentence_embedding_dimension()
+            logger.info(f"Embedding dimension: {self.dimension}")
+        except ImportError as e:
+            logger.warning(f"sentence-transformers not available: {e}. Embedding disabled.")
+            self.model = None
+            self.dimension = 384
 
-    def __call__(self, texts: List[str]) -> List[List[float]]:
-        embeddings = self.model.encode(texts, show_progress_bar=False)
+    def __call__(self, input):
+        """ChromaDB 0.5.x expects parameter name 'input' for EmbeddingFunction"""
+        if self.model is None:
+            logger.warning("EmbeddingFunction called but no model loaded — returning zeros")
+            if isinstance(input, str):
+                return [[0.0] * self.dimension]
+            return [[0.0] * self.dimension for _ in input]
+        if isinstance(input, str):
+            input = [input]
+        embeddings = self.model.encode(input, show_progress_bar=False)
         return embeddings.tolist()
 
 
@@ -61,16 +74,27 @@ class KnowledgeBase:
         os.makedirs(self.persist_dir, exist_ok=True)
 
         self.embedding_fn = EmbeddingFunction()
-        self.client = chromadb.PersistentClient(
-            path=self.persist_dir,
-            settings=Settings(anonymized_telemetry=False),
-        )
-        self.collection = self.client.get_or_create_collection(
-            name=self.COLLECTION_NAME,
-            embedding_function=self.embedding_fn,
-            metadata={"hnsw:space": "cosine"},
-        )
-        logger.info(f"Knowledge base ready at {self.persist_dir} ({self.count()} documents)")
+        self.client = None
+        self.collection = None
+
+        # Lazy import chromadb — tránh crash nếu chưa cài đặt
+        try:
+            import chromadb
+            from chromadb.config import Settings
+            self.client = chromadb.PersistentClient(
+                path=self.persist_dir,
+                settings=Settings(anonymized_telemetry=False),
+            )
+            self.collection = self.client.get_or_create_collection(
+                name=self.COLLECTION_NAME,
+                embedding_function=self.embedding_fn,
+                metadata={"hnsw:space": "cosine"},
+            )
+            logger.info(f"Knowledge base ready at {self.persist_dir} ({self.count()} documents)")
+        except ImportError as e:
+            logger.warning(f"chromadb not available: {e}. Knowledge base disabled.")
+        except Exception as e:
+            logger.error(f"Failed to initialize ChromaDB: {e}. Knowledge base disabled.")
 
     # ─── CRUD ────────────────────────────────────────────────
 
@@ -81,7 +105,7 @@ class KnowledgeBase:
         Args:
             documents: List of {id, content, type, source, metadata}
         """
-        if not documents:
+        if not documents or self.collection is None:
             return 0
 
         ids = []
@@ -109,12 +133,14 @@ class KnowledgeBase:
 
     def delete_documents(self, ids: List[str]):
         """Xoá documents theo ID"""
-        if ids:
+        if ids and self.collection is not None:
             self.collection.delete(ids=ids)
             logger.info(f"Deleted {len(ids)} documents")
 
     def clear(self):
         """Xoá toàn bộ knowledge base"""
+        if self.collection is None:
+            return
         all_ids = self.collection.get()["ids"]
         if all_ids:
             self.collection.delete(ids=all_ids)
@@ -139,6 +165,9 @@ class KnowledgeBase:
         Returns:
             List of {id, content, metadata, distance}
         """
+        if self.collection is None:
+            return []
+
         where = {"type": type_filter} if type_filter else None
 
         results = self.collection.query(
@@ -160,6 +189,8 @@ class KnowledgeBase:
 
     def search_by_type(self, type_name: str, n_results: int = 20) -> List[Dict]:
         """Lấy documents theo loại (không cần query)"""
+        if self.collection is None:
+            return []
         results = self.collection.get(
             where={"type": type_name},
             limit=n_results,
@@ -176,10 +207,20 @@ class KnowledgeBase:
     # ─── HELPERS ─────────────────────────────────────────────
 
     def count(self) -> int:
+        if self.collection is None:
+            return 0
         return self.collection.count()
 
     def get_stats(self) -> Dict:
         """Thống kê các loại documents trong KB"""
+        if self.collection is None:
+            return {
+                "total": 0,
+                "by_type": {},
+                "embedding_model": EMBEDDING_MODEL,
+                "dimension": self.embedding_fn.dimension,
+                "error": "ChromaDB not available",
+            }
         all_metas = self.collection.get()["metadatas"]
         type_counts = {}
         for m in all_metas:
@@ -208,9 +249,11 @@ class KnowledgeBase:
         """
         docs = []
         for p in products:
-            price_str = f"{p.get('discount_price', p['price']):,.0f}₫"
-            if p.get('discount_price'):
-                price_str = f"{p['discount_price']:,.0f}₫ (gốc: {p['price']:,.0f}₫)"
+            price = p.get('price') or 0
+            discount_price = p.get('discount_price')
+            price_str = f"{price:,.0f}₫"
+            if discount_price:
+                price_str = f"{discount_price:,.0f}₫ (gốc: {price:,.0f}₫)"
 
             content = (
                 f"Sản phẩm: {p['name']}. "

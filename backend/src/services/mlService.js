@@ -5,7 +5,7 @@
  */
 
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';
-const REQUEST_TIMEOUT = 60000; // 60s timeout (CF train + Evaluate cần >10s)
+const REQUEST_TIMEOUT = 180000; // 180s timeout (CF train + Evaluate cần >60s với ALS)
 
 const logger = require('../config/logger');
 

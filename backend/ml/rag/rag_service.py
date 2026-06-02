@@ -4,31 +4,41 @@ RAG Service — Retrieval-Augmented Generation pipeline
 1. Nhận câu hỏi từ user
 2. Tìm kiếm documents liên quan trong Knowledge Base
 3. Xây dựng prompt với context + câu hỏi
-4. Gửi đến Ollama local để sinh câu trả lời
+4. Gửi đến AI provider (Ollama local, Groq cloud, ...) để sinh câu trả lời
 5. Trả về câu trả lời + nguồn tham khảo
+
+Hỗ trợ multiple providers:
+- ollama: Chạy local, cần cài Ollama
+- groq: Dùng Groq API (free tier), cần GROQ_API_KEY
 """
 
 import os
-import json
 import logging
 from typing import List, Dict, Optional, Any
-from datetime import datetime
-
-import requests
 
 from .knowledge_base import KnowledgeBase
 
 logger = logging.getLogger(__name__)
 
+# AI Provider configuration
+AI_PROVIDER = os.getenv("AI_PROVIDER", "ollama").lower()  # ollama | groq
+
 # Ollama configuration
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
-OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "60"))
+
+# Groq configuration (OpenAI-compatible)
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama3-70b-8192")
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+
+# Chung
+AI_TIMEOUT = int(os.getenv("AI_TIMEOUT", "30"))
 
 
 class RAGService:
     """
-    RAG pipeline sử dụng Knowledge Base + Ollama local.
+    RAG pipeline sử dụng Knowledge Base + AI provider.
     """
 
     # System prompt — hướng dẫn AI cách trả lời
@@ -63,15 +73,33 @@ Bạn: "Xin lỗi, tôi chỉ được hỗ trợ các câu hỏi về mua sắm
         model: Optional[str] = None,
     ):
         self.kb = knowledge_base
-        self.model = model or OLLAMA_MODEL
-        self.ollama_host = OLLAMA_HOST
-        self.timeout = OLLAMA_TIMEOUT
+        self.provider = AI_PROVIDER
 
-        # Kiểm tra kết nối Ollama
-        self._check_ollama()
+        # Cấu hình theo provider
+        if self.provider == "groq":
+            self.model = model or GROQ_MODEL
+            self.api_key = GROQ_API_KEY
+            self.api_url = f"{GROQ_BASE_URL}/chat/completions"
+            if not self.api_key:
+                logger.warning("GROQ_API_KEY not set — Groq will not work")
+        else:
+            # Ollama (default)
+            self.model = model or OLLAMA_MODEL
+            self.ollama_host = OLLAMA_HOST
+            self.api_url = f"{self.ollama_host}/api/generate"
+            self._check_ollama()
+
+        self.timeout = AI_TIMEOUT
+        logger.info(f"RAGService initialized: provider={self.provider}, model={self.model}")
 
     def _check_ollama(self):
-        """Kiểm tra Ollama service có chạy không"""
+        """Kiểm tra Ollama service có chạy không (lazy import requests)"""
+        try:
+            import requests
+        except ImportError:
+            logger.warning("requests not available — skipping Ollama health check")
+            return
+
         try:
             resp = requests.get(f"{self.ollama_host}/api/tags", timeout=5)
             if resp.status_code == 200:
@@ -89,11 +117,6 @@ Bạn: "Xin lỗi, tôi chỉ được hỗ trợ các câu hỏi về mua sắm
                     )
             else:
                 logger.warning(f"Ollama returned status {resp.status_code}")
-        except requests.exceptions.ConnectionError:
-            logger.warning(
-                f"Không thể kết nối Ollama tại {self.ollama_host}. "
-                f"Đảm bảo Ollama đang chạy (https://ollama.com)"
-            )
         except Exception as e:
             logger.warning(f"Ollama check failed: {e}")
 
@@ -185,48 +208,109 @@ Bạn: "Xin lỗi, tôi chỉ được hỗ trợ các câu hỏi về mua sắm
 
     def _call_ollama(self, prompt: str) -> str:
         """
-        Gọi Ollama API để sinh câu trả lời.
+        Gọi AI provider để sinh câu trả lời.
+        Hỗ trợ: Ollama (local), Groq (cloud).
         """
         try:
-            payload = {
-                "model": self.model,
-                "prompt": prompt,
-                "stream": False,
-                "options": {
-                    "temperature": 0.3,    # Thấp để trả lời chính xác
-                    "top_p": 0.9,
-                    "max_tokens": 1024,    # Giới hạn độ dài câu trả lời
-                },
-            }
+            import requests
+        except ImportError:
+            logger.warning("requests not available — using fallback response")
+            return self._fallback_response(question="")
 
-            resp = requests.post(
-                f"{self.ollama_host}/api/generate",
-                json=payload,
-                timeout=self.timeout,
-            )
-
-            if resp.status_code == 200:
-                result = resp.json()
-                answer = result.get("response", "").strip()
-                return answer if answer else "Xin lỗi, tôi không thể trả lời câu hỏi này ngay lúc này."
+        try:
+            if self.provider == "groq":
+                return self._call_groq(prompt, requests)
             else:
-                logger.error(f"Ollama error: {resp.status_code} - {resp.text}")
-                return self._fallback_response(question="")
-
-        except requests.exceptions.Timeout:
-            logger.error("Ollama timeout")
-            return "Xin lỗi, tôi đang mất tập trung. Bạn có thể hỏi lại sau được không ạ?"
-        except requests.exceptions.ConnectionError:
-            logger.error("Ollama connection refused")
-            return (
-                "Xin lỗi, trợ lý AI chưa sẵn sàng. "
-                "Vui lòng đảm bảo Ollama đã được cài đặt và đang chạy.\n\n"
-                "Cài đặt: https://ollama.com\n"
-                "Sau đó chạy: ollama pull llama3.2:3b"
-            )
+                return self._call_ollama_direct(prompt, requests)
         except Exception as e:
-            logger.error(f"Ollama error: {e}")
-            return "Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại sau."
+            logger.error(f"AI provider error ({self.provider}): {e}")
+            return self._fallback_response(question="")
+
+    def _call_ollama_direct(self, prompt: str, requests) -> str:
+        """Gọi Ollama local API"""
+        payload = {
+            "model": self.model,
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": 0.3,
+                "top_p": 0.9,
+                "max_tokens": 1024,
+            },
+        }
+
+        resp = requests.post(
+            self.api_url,
+            json=payload,
+            timeout=self.timeout,
+        )
+
+        if resp.status_code == 200:
+            result = resp.json()
+            answer = result.get("response", "").strip()
+            return answer if answer else "Xin lỗi, tôi không thể trả lời câu hỏi này ngay lúc này."
+        else:
+            logger.error(f"Ollama error: {resp.status_code} - {resp.text}")
+            return self._fallback_response(question="")
+
+    def _call_groq(self, prompt: str, requests) -> str:
+        """Gọi Groq API (OpenAI-compatible chat completions)"""
+        if not self.api_key:
+            logger.warning("GROQ_API_KEY not set")
+            return self._fallback_response(question="")
+
+        # Tách prompt thành system + user messages
+        # Format prompt: SYSTEM_INSTRUCTIONS + CONTEXT + "CÂU HỎI: ..."
+        messages = []
+
+        if "CÂU HỎI:" in prompt:
+            parts = prompt.split("CÂU HỎI:", 1)
+            system_content = parts[0].strip()
+            user_question = parts[1].strip()
+            # Bỏ "TRẢ LỜI:" ở cuối nếu có
+            if user_question.endswith("TRẢ LỜI:"):
+                user_question = user_question[:-len("TRẢ LỜI:")].strip()
+            if system_content:
+                messages.append({"role": "system", "content": system_content})
+            if user_question:
+                messages.append({"role": "user", "content": user_question})
+        else:
+            messages.append({"role": "user", "content": prompt})
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": 0.3,
+            "max_tokens": 1024,
+            "top_p": 0.9,
+        }
+
+        resp = requests.post(
+            self.api_url,
+            json=payload,
+            headers=headers,
+            timeout=self.timeout,
+        )
+
+        if resp.status_code == 200:
+            result = resp.json()
+            choices = result.get("choices", [])
+            if choices:
+                answer = choices[0].get("message", {}).get("content", "").strip()
+                return answer if answer else "Xin lỗi, tôi không thể trả lời câu hỏi này ngay lúc này."
+        else:
+            logger.error(f"Groq error: {resp.status_code} - {resp.text}")
+            if resp.status_code == 401:
+                return "Xin lỗi, API key không hợp lệ. Vui lòng kiểm tra lại GROQ_API_KEY."
+            elif resp.status_code == 429:
+                return "Xin lỗi, đã vượt quá giới hạn yêu cầu. Vui lòng thử lại sau."
+
+        return self._fallback_response(question="")
 
     def _fallback_response(self, question: str) -> str:
         """

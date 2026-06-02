@@ -3,9 +3,9 @@ services:
     image: postgres:15-alpine
     container_name: khoaluan-postgres
     environment:
-      POSTGRES_DB: khoaluan
-      POSTGRES_USER: khoaluan
-      POSTGRES_PASSWORD: khoaluan123
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
@@ -29,15 +29,15 @@ services:
     ports:
       - "5000:5000"
     environment:
-      - NODE_ENV=development
-      - PORT=5000
-      - DATABASE_URL=postgresql://khoaluan:khoaluan123@postgres:5432/khoaluan
-      - REDIS_URL=redis://redis:6379
-      - JWT_SECRET=khoaluan-jwt-secret-key
-      - JWT_REFRESH_SECRET=khoaluan-refresh-secret-key
-      - JWT_EXPIRES_IN=7d
-      - JWT_REFRESH_EXPIRES_IN=30d
-      - ML_SERVICE_URL=http://ml-service:8000
+      - NODE_ENV=${NODE_ENV}
+      - PORT=${PORT}
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
+      - JWT_REFRESH_EXPIRES_IN=${JWT_REFRESH_EXPIRES_IN}
+      - ML_SERVICE_URL=${ML_SERVICE_URL}
     depends_on:
       - postgres
       - redis
@@ -56,7 +56,14 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://khoaluan:khoaluan123@postgres:5432/khoaluan
+      - DATABASE_URL=${DATABASE_URL}
+      - AI_PROVIDER=${AI_PROVIDER}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GROQ_MODEL=${GROQ_MODEL:-llama-3.3-70b-versatile}
+      - AI_TIMEOUT=${AI_TIMEOUT}
+      - OLLAMA_HOST=${OLLAMA_HOST}
+    extra_hosts:
+      - host.docker.internal:host-gateway
     depends_on:
       - postgres
     volumes:
@@ -80,8 +87,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - VITE_API_URL=http://localhost:5000/api
-      - VITE_ML_API_URL=http://localhost:8000
+      - VITE_API_URL=${VITE_API_URL}
+      - VITE_ML_API_URL=${VITE_ML_API_URL}
     depends_on:
       - backend
     volumes:

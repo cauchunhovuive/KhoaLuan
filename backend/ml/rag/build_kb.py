@@ -37,15 +37,15 @@ def fetch_products(engine) -> list:
     """Fetch sản phẩm từ database"""
     query = text("""
         SELECT
-            p.id, p.name, p.description, p.price, p.discount_price,
-            p.rating, p.sold_count, p.review_count,
+            p.id, p.name, p.description, p.price, p."discountPrice",
+            p.rating, p."soldCount", p."reviewCount",
             c.name AS category_name,
-            u.store_name
+            u."storeName" AS store_name
         FROM "Product" p
-        LEFT JOIN "Category" c ON c.id = p.category_id
-        LEFT JOIN "User" u ON u.id = p.partner_id
-        WHERE p.is_active = true
-        ORDER BY p.sold_count DESC
+        LEFT JOIN "Category" c ON c.id = p."categoryId"
+        LEFT JOIN "User" u ON u.id = p."partnerId"
+        WHERE p."isActive" = true
+        ORDER BY p."soldCount" DESC
         LIMIT 500
     """)
     with engine.connect() as conn:
@@ -70,10 +70,10 @@ def fetch_products(engine) -> list:
 
 def fetch_categories(engine) -> list:
     """Fetch danh mục từ database"""
-    query = text("""
+    query = text(        """
         SELECT id, name, description
         FROM "Category"
-        WHERE is_active = true
+        WHERE "isActive" = true
     """)
     with engine.connect() as conn:
         rows = conn.execute(query).fetchall()

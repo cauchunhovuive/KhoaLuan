@@ -36,6 +36,7 @@ nul
 backend/ml/__pycache__/
 backend/ml/**/*.pyc
 backend/ml/**/.pytest_cache/
+backend/ml/rag/data/
 
 # Docker volumes
 postgres_data/

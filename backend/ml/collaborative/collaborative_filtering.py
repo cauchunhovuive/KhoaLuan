@@ -27,7 +27,7 @@ class CFConfig:
     n_neighbors: int = 20          # Số lượng neighbors cho KNN
     min_sim_threshold: float = 0.1 # Ngưỡng tương tự tối thiểu
     n_factors: int = 50            # Số factors cho Matrix Factorization
-    n_iterations: int = 30         # Số vòng lặp ALS
+    n_iterations: int = 15         # Số vòng lặp ALS
     reg_param: float = 0.1         # Regularization parameter
     alpha: float = 40.0            # Confidence weight cho implicit feedback
     top_n: int = 10                # Số lượng gợi ý mặc định
