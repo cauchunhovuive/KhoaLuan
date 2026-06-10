@@ -233,7 +233,9 @@ Partner có không gian riêng với các tính năng — **tự xử lý đơn 
 
 | Tính năng | Mô tả |
 |-----------|-------|
-| 🔐 **Đăng ký / Đăng nhập** | JWT access + refresh token |
+| 🔐 **Đăng nhập bằng Google** | OAuth 2.0 qua Passport.js, tự động tạo tài khoản |
+| 🔐 **Đăng ký / Đăng nhập thông minh** | Nhập email → check tồn tại → đăng nhập hoặc đăng ký inline trên 1 form |
+| 🔐 **JWT 15 phút** | Access token ngắn hạn + auto-refresh, bảo mật tối ưu |
 | 🔍 **Tìm kiếm & duyệt** | Sản phẩm theo danh mục, giá, đánh giá, tìm kiếm (10/trang) |
 | 🏷️ **Bộ lọc thông minh** | Mùa hè, Mới nhất, Bán chạy, Đánh giá cao, AI Đề xuất (có active state) |
 | 🛒 **Giỏ hàng** | Thêm, sửa, xóa sản phẩm trong giỏ |
@@ -362,7 +364,7 @@ ML Service chạy riêng biệt với backend (Python + FastAPI), cung cấp 4 n
 | **AI Chat** | RAG (Retrieval-Augmented Generation) + Ollama local (llama3.2:3b) + ChromaDB vector store |
 | **Database** | PostgreSQL 15 (Alpine) |
 | **Cache** | Redis 7 (Alpine) với ioredis |
-| **Xác thực** | JWT (access token 7 ngày + refresh token 30 ngày) |
+| **Xác thực** | JWT (access token 15 phút + refresh token 30 ngày) + Google OAuth 2.0 (Passport.js) |
 | **Container** | Docker + Docker Compose (5 services) |
 | **Security** | Helmet + CORS + Rate Limiter + Input Validation (Joi) |
 
@@ -501,6 +503,9 @@ KHOALUAN/
 |--------|----------|-------|:----:|
 | POST | `/auth/register` | Đăng ký khách hàng | Public |
 | POST | `/auth/login` | Đăng nhập | Public |
+| POST | `/auth/check-email` | Kiểm tra email đã tồn tại (dùng cho inline register) | Public |
+| GET | `/auth/google` | Đăng nhập bằng Google (redirect) | Public |
+| GET | `/auth/google/callback` | Google OAuth callback | Public |
 | POST | `/auth/refresh` | Refresh token | Public |
 | POST | `/auth/logout` | Đăng xuất (xóa refresh token) | Protected |
 | GET | `/auth/me` | Thông tin user (+ partner fields) | Protected |
@@ -689,37 +694,40 @@ Recommendation → User?, Cluster?, Product (score, reason)
 1. **3 nhánh người dùng** — Admin, Partner, Customer với quyền riêng biệt
 2. **Partner tự xử lý đơn hàng** — Admin không quản lý đơn hàng
 3. **8 partner shops** — 8 shop với sản phẩm riêng theo từng danh mục
-4. **Session-based Recommendation** — Co-occurrence + Sequence Prediction (281 views)
-5. **Collaborative Filtering** — 4 models: Item-Item, User-User, ALS, Hybrid
-6. **Auto-Train ML** — Tự động train session/CF model trước khi recommend
-7. **A/B Testing** — So sánh Control vs Treatment, tự động log + compare
-8. **ML Test Suite** — Tự động kiểm tra 13 ML endpoints, báo cáo chi tiết
-9. **Phân cụm khách hàng** — K-Means + RFM qua ML Service riêng
-10. **Gợi ý cá nhân hóa** — Dựa trên nhóm khách hàng + lịch sử mua hàng
-11. **Flash Sale** — Sự kiện giảm giá có thời gian, quản lý số lượng
-12. **Mã giảm giá** — 22 mã PERCENTAGE/FIXED, có hạn, theo người dùng
-13. **Chat** — Giữa khách hàng và shop (poll-based)
-14. **Follow shop** — Theo dõi cửa hàng yêu thích
-15. **Hoàn tiền & Vi phạm** — Quy trình xử lý khiếu nại
-16. **Audit Log** — Ghi lại mọi hành động quan trọng
-17. **Thông báo realtime** — Poll 30s cho admin
-18. **Redis Caching** — Cache sản phẩm, gợi ý, trending
-19. **Rate Limiting** — Giới hạn request
-20. **Mobile App** — React Native + Expo (iOS/Android)
-21. **Premium UI toàn diện** — Geist font, glass effects (glass-island), double-bezel cards, skeleton shimmer, stagger animations, custom cubic-bezier transitions
-22. **Phân trang đồng bộ** — 10 items/trang
-23. **Floating Chat Widget** — 2 tab (Shop + AI), glass-morphism panel, luôn sẵn sàng trên mọi trang
-24. **Trợ lý AI (RAG + Ollama)** — RAG pipeline với ChromaDB vector store + Ollama local (llama3.2). Hỏi đáp thông minh về sản phẩm, chính sách, FAQ dựa trên knowledge base thật. Fallback keyword-matching khi Ollama không khả dụng.
-25. **Lazy Image Loading** — IntersectionObserver + blur-up transition, skeleton placeholder
-26. **Code Splitting** — React.lazy() cho 25+ admin/partner routes, Suspense fallback
-27. **Chunk Optimization** — Tách recharts/react-icons thành chunk riêng, tăng cache hit
-28. **Vietsub toàn bộ Admin AI** — ML, A/B Test, Clusters tiếng Việt
-29. **Kho voucher cho user** — Trang /coupons với tab Tất cả/Đã lưu, lọc theo loại, copy mã, đếm ngược hết hạn, skeleton loading
-30. **Avatar upload** — Chọn ảnh → FileReader base64 → dispatch updateProfile, validate file type & size, spinner loading
-31. **Order stats realtime** — Tổng đơn, hoàn thành, đã huỷ từ API, dùng pagination.total chính xác
-32. **HomePage filter pills** — Mùa hè, Mới nhất, Bán chạy, Đánh giá cao, AI Đề xuất — kết nối API sorting thật
-33. **PartnerLayout frame** — max-w-7xl container giới hạn hiển thị trên màn hình rộng
-34. **Loading skeleton cho CouponsPage** — FullPageSkeleton với hero + tabs + filters + card shimmer
+4. **Google OAuth Login** — Đăng nhập bằng Google, tự động tạo user nếu chưa tồn tại
+5. **Inline Email Registration** — Nhập email → check tồn tại → đăng nhập hoặc hiện form đăng ký ngay trên trang login
+6. **JWT 15 phút** — Access token hết hạn sau 15 phút, tự động refresh, bảo mật cao hơn
+7. **Session-based Recommendation** — Co-occurrence + Sequence Prediction (281 views)
+8. **Collaborative Filtering** — 4 models: Item-Item, User-User, ALS, Hybrid
+9. **Auto-Train ML** — Tự động train session/CF model trước khi recommend
+10. **A/B Testing** — So sánh Control vs Treatment, log nhanh, batch, báo cáo realtime
+11. **ML Test Suite** — Tự động kiểm tra 13 ML endpoints, báo cáo chi tiết
+12. **Phân cụm khách hàng** — K-Means + RFM qua ML Service riêng
+13. **Gợi ý cá nhân hóa** — Dựa trên nhóm khách hàng + lịch sử mua hàng
+14. **Flash Sale** — Sự kiện giảm giá có thời gian, quản lý số lượng
+15. **Mã giảm giá** — 22 mã PERCENTAGE/FIXED, có hạn, theo người dùng
+16. **Chat** — Giữa khách hàng và shop (poll-based)
+17. **Follow shop** — Theo dõi cửa hàng yêu thích
+18. **Hoàn tiền & Vi phạm** — Quy trình xử lý khiếu nại
+19. **Audit Log** — Ghi lại mọi hành động quan trọng
+20. **Thông báo realtime** — Poll 30s cho admin
+21. **Redis Caching** — Cache sản phẩm, gợi ý, trending
+22. **Rate Limiting** — Giới hạn request
+23. **Mobile App** — React Native + Expo (iOS/Android)
+24. **Premium UI toàn diện** — Geist font, glass effects (glass-island), double-bezel cards, skeleton shimmer, stagger animations, custom cubic-bezier transitions
+25. **Phân trang đồng bộ** — 10 items/trang
+26. **Floating Chat Widget** — 2 tab (Shop + AI), glass-morphism panel, luôn sẵn sàng trên mọi trang
+27. **Trợ lý AI (RAG + Ollama)** — RAG pipeline với ChromaDB vector store + Ollama local (llama3.2). Hỏi đáp thông minh về sản phẩm, chính sách, FAQ dựa trên knowledge base thật. Fallback keyword-matching khi Ollama không khả dụng.
+28. **Lazy Image Loading** — IntersectionObserver + blur-up transition, skeleton placeholder
+29. **Code Splitting** — React.lazy() cho 25+ admin/partner routes, Suspense fallback
+30. **Chunk Optimization** — Tách recharts/react-icons thành chunk riêng, tăng cache hit
+31. **Vietsub toàn bộ Admin AI** — ML, A/B Test, Clusters tiếng Việt
+32. **Kho voucher cho user** — Trang /coupons với tab Tất cả/Đã lưu, lọc theo loại, copy mã, đếm ngược hết hạn, skeleton loading
+33. **Avatar upload** — Chọn ảnh → FileReader base64 → dispatch updateProfile, validate file type & size, spinner loading
+34. **Order stats realtime** — Tổng đơn, hoàn thành, đã huỷ từ API, dùng pagination.total chính xác
+35. **HomePage filter pills** — Mùa hè, Mới nhất, Bán chạy, Đánh giá cao, AI Đề xuất — kết nối API sorting thật
+36. **PartnerLayout frame** — max-w-7xl container giới hạn hiển thị trên màn hình rộng
+37. **Loading skeleton cho CouponsPage** — FullPageSkeleton với hero + tabs + filters + card shimmer
 
 ---
 

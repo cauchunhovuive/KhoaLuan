@@ -27,7 +27,14 @@ const ABTestingPage = () => {
     setLoading(true);
     try {
       const { data } = await api.get('/ml/abtest/report');
-      setReport(data.data || data);
+      const raw = data.data || data;
+      // Map metrics_per_group lên top-level cho frontend dễ đọc
+      setReport({
+        ...raw.metrics_per_group,
+        comparisons: raw.comparisons,
+        confidence_level: raw.confidence_level,
+        groups: raw.groups,
+      });
     } catch (err) {
       toast.error('Không thể tải báo cáo A/B Test');
     } finally {
@@ -63,7 +70,10 @@ const ABTestingPage = () => {
         groupA: 'control',
         groupB: 'treatment',
       });
-      setCompareResult(data.data || data);
+      const raw = data.data || data;
+      // So sánh trả về dict với key là 'control_vs_treatment' chứa comparison data
+      const comparisons = raw.comparisons || raw;
+      setCompareResult(comparisons);
       toast.success('So sánh hoàn tất!');
     } catch (err) {
       toast.error('So sánh thất bại');
@@ -87,6 +97,8 @@ const ABTestingPage = () => {
     }
   };
 
+  const getRandomFrom = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
   const handleLog = async () => {
     if (!logForm.userId || !logForm.productId) {
       toast.error('Nhập userId và productId');
@@ -96,7 +108,17 @@ const ABTestingPage = () => {
     try {
       await api.post('/ml/abtest/log', logForm);
       toast.success(`Đã ghi: ${logForm.group} - ${logForm.action}`);
-      setLogForm({ group: 'control', userId: '', productId: '', action: 'impression', revenue: 0 });
+      // Sau khi ghi thành công, tự động fill userId + productId ngẫu nhiên từ dữ liệu mẫu
+      const { customers, products } = sampleData;
+      const nextCust = customers.length > 0 ? getRandomFrom(customers) : null;
+      const nextProd = products.length > 0 ? getRandomFrom(products) : null;
+      setLogForm({
+        group: logForm.group === 'control' ? 'treatment' : 'control',  // Đảo nhóm
+        userId: nextCust?.id || '',
+        productId: nextProd?.id || '',
+        action: 'impression',
+        revenue: 0,
+      });
       fetchReport();
     } catch (err) {
       toast.error('Ghi nhận thất bại');
@@ -105,18 +127,28 @@ const ABTestingPage = () => {
     }
   };
 
-  // Log mẫu: điền form với dữ liệu ngẫu nhiên
-  const fillSampleLog = (group, action, revenue = 0) => {
+  // Log mẫu nhanh: gửi trực tiếp một tương tác (không cần điền form)
+  const handleQuickLog = async (group, action, revenue = 0) => {
     const { customers, products } = sampleData;
     const randCust = customers[Math.floor(Math.random() * customers.length)];
     const randProd = products[Math.floor(Math.random() * products.length)];
-    setLogForm({
-      group,
-      userId: randCust?.id || '',
-      productId: randProd?.id || '',
-      action,
-      revenue,
-    });
+    if (!randCust || !randProd) {
+      toast.error('Không có dữ liệu mẫu');
+      return;
+    }
+    try {
+      await api.post('/ml/abtest/log', {
+        group,
+        userId: randCust.id,
+        productId: randProd.id,
+        action,
+        revenue,
+      });
+      toast.success(`✅ Đã ghi: ${group} - ${action}`, { duration: 2000 });
+      fetchReport();
+    } catch (err) {
+      toast.error('Ghi thất bại');
+    }
   };
 
   // Log mẫu: gửi trực tiếp 5 tương tác (batch)
@@ -147,6 +179,22 @@ const ABTestingPage = () => {
     } finally {
       setLoggingBatch(false);
     }
+  };
+
+  // Format giá trị compare dựa trên loại metric
+  const formatCompareValue = (key, value) => {
+    if (typeof value !== 'number') return String(value);
+    // Các metric là tỷ lệ (0-1) → nhân 100 thành %
+    const rateMetrics = ['ctr', 'conversion_rate', 'purchase_rate', 'click_rate', 'impression_rate', 'rate'];
+    if (rateMetrics.some(m => key.includes(m))) {
+      return (value * 100).toFixed(1) + '%';
+    }
+    // Revenue → format tiền VNĐ
+    if (key.includes('revenue') || key.includes('doanh_thu')) {
+      return value.toLocaleString('vi-VN') + '₫';
+    }
+    // Còn lại (sample_size, clicks, purchases, ...) → số nguyên
+    return value.toLocaleString('vi-VN');
   };
 
   return (
@@ -225,21 +273,32 @@ const ABTestingPage = () => {
               </div>
 
               {/* Comparison */}
-              {report.comparison && (
-                <div className="p-4 bg-gradient-to-r from-primary-50 to-violet-50 rounded-xl border border-primary-100">
-                  <p className="text-xs font-semibold text-ink-tertiary uppercase mb-2">So sánh</p>
-                  <div className="space-y-1 text-sm">
-                    {Object.entries(report.comparison).map(([key, val]) => (
-                      <div key={key} className="flex justify-between">
-                        <span className="text-ink-secondary">{key.replace(/_/g, ' ')}</span>
-                        <span className={`font-semibold ${val > 0 ? 'text-emerald-600' : val < 0 ? 'text-red-600' : 'text-ink'}`}>
-                          {typeof val === 'number' ? (val > 0 ? '+' : '') + (val * 100).toFixed(1) + '%' : String(val)}
-                        </span>
-                      </div>
-                    ))}
+              {report.comparisons && (() => {
+                const compKey = Object.keys(report.comparisons)[0];
+                const compData = compKey ? report.comparisons[compKey] : null;
+                if (!compData) return null;
+                return (
+                  <div className="p-4 bg-gradient-to-r from-primary-50 to-violet-50 rounded-xl border border-primary-100">
+                    <p className="text-xs font-semibold text-ink-tertiary uppercase mb-2">So sánh</p>
+                    <div className="space-y-1 text-sm">
+                      {Object.entries(compData).map(([key, val]) => (
+                        <div key={key} className="flex justify-between">
+                          <span className="text-ink-secondary">{key.replace(/_/g, ' ')}</span>
+                          {typeof val === 'object' && val !== null ? (
+                            <span className="font-semibold text-ink">
+                              {val.winner ? `${val.winner} (${val.improvement_pct > 0 ? '+' : ''}${val.improvement_pct}%)` : ''}
+                            </span>
+                          ) : (
+                            <span className={`font-semibold ${typeof val === 'number' && val > 0 ? 'text-emerald-600' : typeof val === 'number' && val < 0 ? 'text-red-600' : 'text-ink'}`}>
+                              {typeof val === 'number' ? (val > 0 ? '+' : '') + (val * 100).toFixed(1) + '%' : String(val)}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           ) : (
             <div className="py-12 text-center text-ink-tertiary">Chưa có dữ liệu. Nhấn <strong>"Ghi 5 tương tác mẫu"</strong> để bắt đầu!</div>
@@ -301,27 +360,27 @@ const ABTestingPage = () => {
                 <div className="pt-2 border-t border-gray-100">
                   <p className="text-[10px] font-semibold text-ink-tertiary uppercase mb-2">Log mẫu nhanh</p>
                   <div className="grid grid-cols-2 gap-2">
-                    <button onClick={() => fillSampleLog('control', 'impression')}
-                      className="text-[10px] bg-blue-50 text-blue-700 px-2 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-100 transition-colors">
+                    <button onClick={() => handleQuickLog('control', 'impression')}
+                      className="text-[10px] bg-blue-50 text-blue-700 px-2 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-100 transition-colors active:scale-95">
                       👁 Đối chứng Xem
                     </button>
-                    <button onClick={() => fillSampleLog('treatment', 'click')}
-                      className="text-[10px] bg-violet-50 text-violet-700 px-2 py-1.5 rounded-lg border border-violet-200 hover:bg-violet-100 transition-colors">
+                    <button onClick={() => handleQuickLog('treatment', 'click')}
+                      className="text-[10px] bg-violet-50 text-violet-700 px-2 py-1.5 rounded-lg border border-violet-200 hover:bg-violet-100 transition-all active:scale-95">
                       🖱 Thử nghiệm Click
                     </button>
-                    <button onClick={() => fillSampleLog('control', 'add_to_cart')}
-                      className="text-[10px] bg-amber-50 text-amber-700 px-2 py-1.5 rounded-lg border border-amber-200 hover:bg-amber-100 transition-colors">
+                    <button onClick={() => handleQuickLog('control', 'add_to_cart')}
+                      className="text-[10px] bg-amber-50 text-amber-700 px-2 py-1.5 rounded-lg border border-amber-200 hover:bg-amber-100 transition-all active:scale-95">
                       🛒 Đối chứng Thêm giỏ
                     </button>
-                    <button onClick={() => fillSampleLog('treatment', 'purchase', 500000)}
-                      className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition-colors">
+                    <button onClick={() => handleQuickLog('treatment', 'purchase', 500000)}
+                      className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition-all active:scale-95">
                       💰 Thử nghiệm Mua (500K)
                     </button>
                   </div>
                   <button onClick={handleSampleBatch} disabled={loggingBatch}
-                    className="mt-2 w-full text-[10px] bg-gradient-to-r from-primary-500 to-violet-500 text-white px-2 py-2 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-60 inline-flex items-center justify-center space-x-1"
+                    className="mt-2 w-full text-xs bg-gradient-to-r from-primary-500 to-violet-500 text-white px-2 py-2.5 rounded-lg hover:opacity-90 transition-all disabled:opacity-60 inline-flex items-center justify-center space-x-1.5 active:scale-[0.98] font-medium"
                   >
-                    <FiZap className={`text-xs ${loggingBatch ? 'animate-pulse' : ''}`} />
+                    <FiZap className={`text-sm ${loggingBatch ? 'animate-pulse' : ''}`} />
                     <span>{loggingBatch ? 'Đang ghi 5 mẫu...' : '⚡ Ghi 5 tương tác mẫu'}</span>
                   </button>
                 </div>
@@ -343,9 +402,18 @@ const ABTestingPage = () => {
             {compareResult && (
               <div className="mt-3 p-3 bg-surface-secondary rounded-xl text-xs space-y-1">
                 {Object.entries(compareResult).map(([key, val]) => (
-                  <div key={key} className="flex justify-between">
-                    <span className="text-ink-tertiary">{key.replace(/_/g, ' ')}</span>
-                    <span className="font-semibold text-ink">{typeof val === 'number' ? (val * 100).toFixed(1) + '%' : String(val)}</span>
+                  <div key={key} className="py-1">
+                    <p className="text-ink-tertiary font-medium mb-1">{key.replace(/_/g, ' ')}</p>
+                    {typeof val === 'object' && val !== null ? (
+                      <div className="space-y-0.5 pl-2">
+                        {val.control !== undefined && <div className="flex justify-between"><span>Control:</span><span>{formatCompareValue(key, val.control)}</span></div>}
+                        {val.treatment !== undefined && <div className="flex justify-between"><span>Treatment:</span><span>{formatCompareValue(key, val.treatment)}</span></div>}
+                        {val.winner !== undefined && <div className="flex justify-between font-medium text-primary-600"><span>Người thắng:</span><span>{val.winner}</span></div>}
+                        {val.improvement_pct !== undefined && <div className="flex justify-between"><span>Cải thiện:</span><span className={val.improvement_pct > 0 ? 'text-emerald-600' : 'text-red-600'}>{val.improvement_pct > 0 ? '+' : ''}{val.improvement_pct}%</span></div>}
+                      </div>
+                    ) : (
+                      <span className="font-semibold text-ink">{String(val)}</span>
+                    )}
                   </div>
                 ))}
               </div>

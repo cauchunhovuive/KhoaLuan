@@ -33,7 +33,7 @@ GROQ_MODEL = os.getenv("GROQ_MODEL", "llama3-70b-8192")
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 
 # Chung
-AI_TIMEOUT = int(os.getenv("AI_TIMEOUT", "30"))
+AI_TIMEOUT = int(os.getenv("AI_TIMEOUT", "30") or "30")
 
 
 class RAGService:

@@ -478,16 +478,20 @@ class ABTestFramework:
         purchases = sum(1 for log in logs if log['action'] == 'purchase')
         revenue = sum(log['revenue'] for log in logs if log['action'] == 'purchase')
         
+        unique_users = set(log['user_id'] for log in logs)
+
         return {
+            'total_events': len(logs),
             'impressions': impressions,
             'clicks': clicks,
             'add_to_carts': add_to_carts,
             'purchases': purchases,
+            'revenue': revenue,
+            'unique_users': len(unique_users),
             'ctr': (clicks / impressions) if impressions > 0 else 0.0,
             'click_to_cart': (add_to_carts / clicks) if clicks > 0 else 0.0,
             'cart_to_purchase': (purchases / add_to_carts) if add_to_carts > 0 else 0.0,
             'overall_conversion': (purchases / impressions) if impressions > 0 else 0.0,
-            'revenue': revenue,
         }
 
     def compare_groups(self, group_a: str, group_b: str) -> Dict:
@@ -512,7 +516,7 @@ class ABTestFramework:
             if val_a > 0:
                 improvement = ((val_b - val_a) / val_a) * 100
             elif val_b > 0:
-                improvement = float('inf')
+                improvement = 999.99  # Không có dữ liệu cũ, ước lượng cải thiện rất lớn
             else:
                 improvement = 0.0
             

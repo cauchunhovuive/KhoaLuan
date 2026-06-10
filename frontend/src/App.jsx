@@ -1,5 +1,6 @@
 import React, { useEffect, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import GoogleCallbackPage from './pages/auth/GoogleCallbackPage';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchCurrentUser } from './store/authSlice';
 import { fetchSettings } from './store/settingsSlice';
@@ -138,6 +139,7 @@ function App() {
       {/* Auth routes */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
 
       {/* Partner routes (lazy loaded) */}
       <Route path="/partner" element={

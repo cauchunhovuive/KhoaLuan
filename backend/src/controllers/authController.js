@@ -71,6 +71,11 @@ const login = asyncHandler(async (req, res) => {
     throw new AppError('Email hoặc mật khẩu không đúng', 401);
   }
 
+  // OAuth user (Google) không có password local
+  if (!user.password) {
+    throw new AppError('Tài khoản này được đăng nhập qua Google. Vui lòng dùng Google để đăng nhập.', 401);
+  }
+
   const isPasswordValid = await bcrypt.compare(password, user.password);
   if (!isPasswordValid) {
     throw new AppError('Email hoặc mật khẩu không đúng', 401);
@@ -194,6 +199,43 @@ const logout = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Đăng xuất thành công' });
 });
 
+// @desc    Check if email is already registered
+// @route   POST /api/auth/check-email
+const checkEmail = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    throw new AppError('Vui lòng nhập email', 400);
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, authProvider: true },
+  });
+
+  res.json({
+    success: true,
+    data: {
+      exists: !!user,
+      authProvider: user?.authProvider || null,
+    },
+  });
+});
+
+// @desc    Google OAuth callback — redirect về frontend kèm token
+// @route   GET /api/auth/google/callback
+const googleCallback = asyncHandler(async (req, res) => {
+  const { user, token, refreshToken } = req.user || {};
+
+  if (!token) {
+    // Lỗi — redirect về frontend với error
+    return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=auth_failed`);
+  }
+
+  // Redirect về frontend kèm token trong hash fragment
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  res.redirect(`${frontendUrl}/auth/google/callback?token=${token}&refreshToken=${refreshToken}`);
+});
+
 // @desc    Change password
 // @route   PUT /api/auth/change-password
 const changePassword = asyncHandler(async (req, res) => {
@@ -230,4 +272,6 @@ module.exports = {
   updateProfile,
   logout,
   changePassword,
+  checkEmail,
+  googleCallback,
 };

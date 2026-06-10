@@ -45,6 +45,8 @@ model User {
   isActive       Boolean   @default(true)
   role           UserRole  @default(CUSTOMER)
   refreshToken   String?
+  googleId       String?   @unique // Google OAuth ID
+  authProvider   String    @default("local") // local, google
   clusterId      String?
   totalSpent     Float     @default(0)
   orderCount     Int       @default(0)

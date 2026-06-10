@@ -2,6 +2,18 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import api from '../services/api';
 
 // Async thunks
+export const checkEmail = createAsyncThunk(
+  'auth/checkEmail',
+  async (email, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post('/auth/check-email', { email });
+      return data.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Kiểm tra email thất bại');
+    }
+  }
+);
+
 export const loginUser = createAsyncThunk(
   'auth/login',
   async (credentials, { rejectWithValue }) => {

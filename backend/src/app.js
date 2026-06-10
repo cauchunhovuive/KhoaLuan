@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const passport = require('./config/passport');
 const { connectDatabase } = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
 const logger = require('./config/logger');
@@ -11,6 +12,9 @@ const AppError = require('./utils/AppError');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Google OAuth (passport)
+app.use(passport.initialize());
 
 // Security middleware
 app.use(helmet());
@@ -41,6 +45,11 @@ app.get('/api/health', (req, res) => {
 
 // API Routes
 app.use('/api', routes);
+
+// Redirect /auth/google → /api/auth/google (tiện cho frontend)
+app.get('/auth/google', (req, res) => {
+  res.redirect('/api/auth/google');
+});
 
 // 404 handler
 app.all('*', (req, res, next) => {
