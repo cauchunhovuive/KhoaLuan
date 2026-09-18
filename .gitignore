@@ -49,3 +49,6 @@ backend/ml/datasets/yoochoose/*
 
 # Docker volumes
 postgres_data/
+
+# PowerPoint lock files
+~$*.pptx
