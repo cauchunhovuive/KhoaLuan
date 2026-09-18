@@ -200,7 +200,7 @@ Admin có toàn quyền quản lý hệ thống qua dashboard. **Admin không qu
 | 🤝 **Quản lý đối tác** | Phê duyệt / từ chối đối tác mới đăng ký |
 | 🎯 **Phân cụm khách hàng** | Tạo nhóm, chạy phân cụm K-Means/RFM qua ML Service |
 | 💡 **Gợi ý sản phẩm** | Huấn luyện Session, CF, đánh giá mô hình, test gợi ý |
-| 🧪 **Kiểm tra ML** | Tự động chạy 13 ML endpoints, báo cáo kết quả |
+| 🧪 **Kiểm tra ML** | Tự động chạy 16 ML endpoints (gồm HSP/RIC, LightGCN-CF, Graph CF), báo cáo kết quả |
 | 📊 **A/B Test** | So sánh Control vs Treatment, xem báo cáo |
 | 🏆 **Mã giảm giá** | CRUD mã giảm giá, theo dõi lượt sử dụng (10/trang) |
 | 🖼️ **Banner** | Quản lý banner trang chủ (vị trí, link, màu nền) |
@@ -349,6 +349,33 @@ ML Service chạy riêng biệt với backend (Python + FastAPI), cung cấp 4 n
 | NDCG Score | 0.022 |
 | Coverage | 0.465 |
 | Popularity Bias | 0.157 |
+
+### Benchmark HSP & RIC trên Yoochoose (bài báo Session-based)
+
+Dataset **Yoochoose** (RecSys Challenge 2015 — 375,043 phiên mua sắm thật, 16,245 sản phẩm) đã được track trong repo tại `backend/ml/datasets/yoochoose/` — chạy lại benchmark trực tiếp mà không cần tải dữ liệu:
+
+```bash
+cd backend/ml
+
+# Demo nhanh (~1 phút): train 375k phiên + đánh giá 500 phiên test đầu
+python -m session.benchmark_hsp_ric --dataset yoochoose --max_test 500
+
+# Đánh giá đầy đủ như bài báo Delianidi et al. 2023 (MRR@K, Recall@K với K=10,20,30)
+# (cuối màn chạy tự tune forgetting factor α của RIC từ 0.1 → 0.9)
+python -m session.benchmark_hsp_ric --dataset yoochoose --max_test 5000
+```
+
+Kết quả chuẩn đã ghi nhận (5000 phiên test, `benchmark_yoochoose_results.txt`):
+
+| Method | MRR@10 | Rec@10 | Rec@20 |
+|--------|:------:|:------:|:------:|
+| cooccurrence | 0.1595 | 0.3224 | 0.4018 |
+| sequence | 0.1855 | 0.3742 | 0.4562 |
+| hsp | 0.1227 | 0.2670 | 0.3426 |
+| **ric** | **0.1902** | **0.3746** | **0.4490** |
+| ric_cil | 0.1902 | 0.3746 | 0.4490 |
+
+> Thời gian train ~11s trên CPU thường, không cần GPU. Dataset Diginetica (42MB) không track trong repo — tải tại [RecoHut-Datasets/diginetica](https://github.com/RecoHut-Datasets/diginetica) nếu cần chạy thêm.
 
 ---
 
@@ -539,6 +566,10 @@ KHOALUAN/
 | POST | `/ml/session/recommend` | Gợi ý theo phiên (auto-train) | Public |
 | POST | `/ml/session/train` | Huấn luyện Session model | ADMIN |
 | POST | `/ml/cf/train` | Huấn luyện CF models | ADMIN |
+| POST | `/ml/graphcf/train` | Huấn luyện Graph CF nhẹ (Li & Zhang 2025) | ADMIN |
+| POST | `/ml/graphcf/recommend` | Gợi ý bằng Graph CF (auto-train) | ADMIN |
+| POST | `/ml/lightgcncf/train` | Huấn luyện LightGCN-CF (PyTorch, BPR) | ADMIN |
+| POST | `/ml/lightgcncf/recommend` | Gợi ý bằng LightGCN-CF (auto-train) | ADMIN |
 | POST | `/ml/explain` | Giải thích gợi ý (auto-train CF) | ADMIN |
 | POST | `/ml/evaluate` | Đánh giá mô hình offline | ADMIN |
 | GET | `/ml/health` | ML Service health | Public |
