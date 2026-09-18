@@ -1067,6 +1067,61 @@ async def recommend_session(request: SessionRecommendRequest):
 # --- Paper benchmark state (giữ model Yoochoose giữa các lần gọi) ---
 _paper_model = None        # SessionRecommender đã fit trên Yoochoose
 _paper_stats_cache = None  # stats dataset (tính 1 lần)
+_paper_names = None        # map item_id -> tên minh họa (data gốc ẩn danh)
+
+# Tên minh họa cho item ẩn danh của Yoochoose (gán theo thứ tự phổ biến giảm dần)
+# — chỉ để demo dễ đọc, không phải tên thật trong data gốc
+PAPER_ITEM_NAMES = [
+    "iPhone 15 Pro Max", "Ốp lưng iPhone 15", "Củ sạc nhanh 20W", "AirPods Pro 2",
+    "Cáp Lightning", "Samsung Galaxy S24 Ultra", "Ốp lưng Galaxy S24", "Galaxy Buds FE",
+    "Củ sạc Samsung 25W", "Cáp Type-C", "Xiaomi Redmi Note 13", "Ốp lưng Xiaomi",
+    "Tai nghe Bluetooth TWS", "Pin sạc dự phòng 20.000mAh", "Giá đỡ điện thoại", "Kính cường lực",
+    "MacBook Air M2", "Chuột Logitech MX Master", "Bàn phím cơ Keychron", "Túi chống sốc laptop",
+    "Cáp HDMI", "Hub USB-C 7 in 1", "Dell XPS 15", "Chuột gaming Logitech G",
+    "Bàn phím không dây", "Webcam Logitech C920", "Màn hình LG 24 inch", "iPad Air 5",
+    "Bút Apple Pencil", "Ốp lưng iPad", "Nike Air Force 1", "Giày chạy bộ Adidas",
+    "Vớ thể thao (3 đôi)", "Balo laptop", "Áo thun cotton", "Quần jean nam",
+    "Áo sơ mi trắng", "Apple Watch SE", "Dây đeo đồng hồ", "Kem chống nắng SPF50",
+    "Sữa rửa mặt dịu nhẹ", "Serum Vitamin C", "Mặt nạ dưỡng da (hộp 10)", "Nồi chiên không dầu",
+    "Bộ nồi inox 5 chiếc", "Máy xay sinh tố", "Bình giữ nhiệt Lock&Lock", "Máy pha cà phê",
+    "Robot hút bụi", "Đèn bàn LED", "Bút máy Lamy", "Sổ tay planner",
+    "Sách Nhà giả kim", "Sách Atomic Habits", "Balo du lịch 30L", "Bình nước thể thao",
+    "Thảm tập yoga", "Dây nhảy skipping", "Đồ chơi Lego", "Gối memory foam",
+]
+
+
+def _build_paper_names(train_sessions):
+    """Gán tên minh họa cho top item phổ biến nhất (gọi 1 lần, cache)."""
+    global _paper_names
+    if _paper_names is not None:
+        return _paper_names
+    from collections import Counter
+    counter = Counter()
+    for s in train_sessions:
+        counter.update(set(s['items']))
+    top = [pid for pid, _ in counter.most_common(len(PAPER_ITEM_NAMES))]
+    _paper_names = {pid: PAPER_ITEM_NAMES[i] for i, pid in enumerate(top)}
+    return _paper_names
+
+
+def paper_display_name(pid: str) -> str:
+    if _paper_names and pid in _paper_names:
+        return _paper_names[pid]
+    return f"Sản phẩm #{pid}"
+
+
+def _ensure_paper_model():
+    """Lazy train model Yoochoose (dùng chung cho benchmark + paper-recommend)."""
+    global _paper_model
+    if _paper_model is None:
+        train_sessions, _ = load_yoochoose()
+        _build_paper_names(train_sessions)
+        t0 = time.perf_counter()
+        rec = SessionRecommender(SessionConfig(top_n=30))
+        rec.fit(train_sessions)
+        _paper_model = rec
+        logger.info(f"Paper model trained in {time.perf_counter() - t0:.2f}s (lazy)")
+    return _paper_model
 
 
 def _load_paper_stats():
@@ -1078,6 +1133,7 @@ def _load_paper_stats():
         train_sessions, test_samples = load_yoochoose()
     except FileNotFoundError as e:
         raise HTTPException(status_code=503, detail=str(e))
+    _build_paper_names(train_sessions)
 
     n_items = len({it for s in train_sessions for it in s['items']})
     total_clicks = sum(len(s['items']) for s in train_sessions)
@@ -1092,7 +1148,9 @@ def _load_paper_stats():
         "total_clicks": total_clicks,
         "avg_session_length": round(avg_len, 2),
         "sample_sessions": [
-            {"session_id": s['session_id'], "items": s['items'][:8]}
+            {"session_id": s['session_id'],
+             "items": [{"id": it, "name": _paper_names.get(it, f"Sản phẩm #{it}") if _paper_names else f"#{it}"}
+                       for it in s['items'][:6]]}
             for s in train_sessions if len(s['items']) >= 4
         ][:5],
     }
@@ -1127,6 +1185,7 @@ async def paper_recommend(request: PaperRecommendRequest):
     global _paper_model
     if _paper_model is None:
         train_sessions, _ = load_yoochoose()
+        _build_paper_names(train_sessions)
         t0 = time.perf_counter()
         rec = SessionRecommender(SessionConfig(top_n=30))
         rec.fit(train_sessions)
@@ -1139,6 +1198,9 @@ async def paper_recommend(request: PaperRecommendRequest):
         strategy=request.strategy,
         alpha=request.alpha,
     )
+    # Gắn tên minh họa cho item ẩn danh (data gốc chỉ có mã số)
+    for r in recs:
+        r['name'] = paper_display_name(r['product_id'])
     return {
         "success": True,
         "data": {
@@ -1152,10 +1214,11 @@ async def paper_recommend(request: PaperRecommendRequest):
 @app.post("/session/benchmark/reset")
 async def reset_paper_benchmark():
     """Xóa model + stats Yoochoose đang cache — lần benchmark sau sẽ train lại từ đầu."""
-    global _paper_model, _paper_stats_cache
+    global _paper_model, _paper_stats_cache, _paper_names
     had_model = _paper_model is not None
     _paper_model = None
     _paper_stats_cache = None
+    _paper_names = None
     logger.info(f"Paper benchmark reset (had_cached_model={had_model})")
     return {
         "success": True,

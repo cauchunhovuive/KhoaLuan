@@ -257,10 +257,7 @@ const SessionPaperDemoPage = () => {
       const results = await Promise.all(strategies.map(s => {
         if (modelSource === 'paper') {
           return api.post('/ml/paper/recommend', { sessionItems, topN: 3, strategy: s })
-            .then(({ data }) => ({
-              strategy: s,
-              recs: (data.data?.recommendations || []).map(r => ({ ...r, name: `Sản phẩm #${r.product_id}` })),
-            }))
+            .then(({ data }) => ({ strategy: s, recs: data.data?.recommendations || [] }))
             .catch(() => ({ strategy: s, recs: [] }));
         }
         return api.post('/ml/session/recommend', { sessionItems, topN: 3, strategy: s })
@@ -486,7 +483,7 @@ const SessionPaperDemoPage = () => {
             </button>
           </div>
           {modelSource === 'paper' && (
-            <p className="text-[10px] text-cyan-700">Lần đầu chạy sẽ train model trên 375,043 phiên (~13s) — model ẩn danh, sản phẩm hiển thị dạng mã số</p>
+            <p className="text-[10px] text-cyan-700">Lần đầu chạy sẽ train model trên 375,043 phiên (~13s) — tên sản phẩm minh họa theo mức phổ biến</p>
           )}
         </div>
 
@@ -549,11 +546,11 @@ const SessionPaperDemoPage = () => {
                 </div>
               ) : (
                 <div className="max-w-xl">
-                  {recList(paperRecs.map(r => ({ ...r, name: `Sản phẩm #${r.product_id}` })), strategy === 'hsp')}
+                  {recList(paperRecs, strategy === 'hsp')}
                 </div>
               )}
               <p className="text-[10px] text-cyan-600 mt-2">
-                Data bài báo ẩn danh → sản phẩm hiển thị dạng mã số (Sản phẩm #19). Chất lượng gợi ý phản ánh model học từ data lớn — khác hẳn model shop chỉ có ~1k views.
+                Dataset gốc ẩn danh — tên sản phẩm là <b>tên minh họa</b> gán theo mức độ phổ biến (top item phổ biến nhất = "iPhone 15 Pro Max"...). Model vẫn train trên đúng 375,043 phiên thật của bài báo.
               </p>
             </div>
           </div>
@@ -696,7 +693,7 @@ const SessionPaperDemoPage = () => {
                       {s.items.map((it, idx) => (
                         <React.Fragment key={idx}>
                           {idx > 0 && <FiArrowRight className="text-gray-300 text-[10px]" />}
-                          <span className="px-1.5 py-0.5 bg-white rounded text-[10px] text-ink border border-gray-100">{it}</span>
+                          <span className="px-1.5 py-0.5 bg-white rounded text-[10px] text-ink border border-gray-100">{typeof it === 'object' ? it.name : `#${it}`}</span>
                         </React.Fragment>
                       ))}
                     </div>
