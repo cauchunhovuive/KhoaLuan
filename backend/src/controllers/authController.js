@@ -71,6 +71,11 @@ const login = asyncHandler(async (req, res) => {
     throw new AppError('Email hoặc mật khẩu không đúng', 401);
   }
 
+  // Kiểm tra tài khoản bị khóa
+  if (!user.isActive) {
+    throw new AppError('Tài khoản của bạn đã bị vô hiệu hóa do vi phạm. Vui lòng liên hệ hỗ trợ.', 401);
+  }
+
   // OAuth user (Google) không có password local
   if (!user.password) {
     throw new AppError('Tài khoản này được đăng nhập qua Google. Vui lòng dùng Google để đăng nhập.', 401);
@@ -221,7 +226,7 @@ const checkEmail = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Google OAuth callback — redirect về frontend kèm token
+// @desc    Google OAuth callback — redirect về frontend hoặc mobile kèm token
 // @route   GET /api/auth/google/callback
 const googleCallback = asyncHandler(async (req, res) => {
   const { user, token, refreshToken } = req.user || {};
@@ -231,7 +236,13 @@ const googleCallback = asyncHandler(async (req, res) => {
     return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=auth_failed`);
   }
 
-  // Redirect về frontend kèm token trong hash fragment
+  // Kiểm tra state param — nếu là mobile redirect URI thì dùng nó
+  const mobileRedirect = req.googleState || '';
+  if (mobileRedirect && (mobileRedirect.startsWith('khoaluan://') || mobileRedirect.startsWith('exp://'))) {
+    return res.redirect(`${mobileRedirect}?token=${token}&refreshToken=${refreshToken}`);
+  }
+
+  // Mặc định: redirect về web frontend
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
   res.redirect(`${frontendUrl}/auth/google/callback?token=${token}&refreshToken=${refreshToken}`);
 });

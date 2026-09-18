@@ -249,18 +249,64 @@ const getOrder = asyncHandler(async (req, res) => {
 // @route   PUT /api/orders/:id/cancel
 const cancelOrder = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const order = await prisma.order.findUnique({ where: { id } });
+  const order = await prisma.order.findUnique({
+    where: { id },
+    include: {
+      orderItems: true,
+      coupon: { select: { id: true, code: true } },
+    },
+  });
 
   if (!order) throw new AppError('Đơn hàng không tồn tại', 404);
   if (order.userId !== req.user.id) throw new AppError('Bạn không có quyền hủy đơn hàng này', 403);
   if (order.status !== 'PENDING') throw new AppError('Chỉ có thể hủy đơn hàng đang chờ xử lý', 400);
 
-  const updated = await prisma.order.update({
-    where: { id },
-    data: { status: 'CANCELLED' },
+  await prisma.$transaction(async (tx) => {
+    // Hoàn lại tồn kho
+    for (const item of order.orderItems) {
+      await tx.product.update({
+        where: { id: item.productId },
+        data: {
+          stock: { increment: item.quantity },
+          soldCount: { decrement: item.quantity },
+        },
+      });
+    }
+
+    // Hoàn lại lượt dùng coupon (nếu có)
+    if (order.couponId) {
+      await tx.coupon.update({
+        where: { id: order.couponId },
+        data: { usedCount: { decrement: 1 } },
+      });
+      // Xóa bản ghi coupon usage
+      await tx.couponUsage.deleteMany({
+        where: { couponId: order.couponId, orderId: id },
+      });
+    }
+
+    // Cập nhật trạng thái đơn
+    await tx.order.update({
+      where: { id },
+      data: { status: 'CANCELLED' },
+    });
   });
 
-  res.json({ success: true, data: updated });
+  // Thông báo cho admin
+  await prisma.notification.create({
+    data: {
+      type: 'ORDER',
+      title: 'Đơn hàng đã hủy',
+      message: `Đơn hàng #${id.slice(0, 8)} đã bị hủy bởi khách hàng`,
+      referenceId: id,
+    },
+  });
+
+  const cancelled = await prisma.order.findUnique({
+    where: { id },
+    include: { orderItems: true },
+  });
+  res.json({ success: true, data: cancelled, message: 'Đã hủy đơn hàng thành công' });
 });
 
 // @desc    Update order status (Admin/Partner)
@@ -271,7 +317,10 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
 
   const existing = await prisma.order.findUnique({
     where: { id },
-    include: { orderItems: { include: { product: { select: { partnerId: true } } } } },
+    include: {
+      orderItems: { include: { product: { select: { partnerId: true } } } },
+      coupon: { select: { id: true, code: true } },
+    },
   });
 
   if (!existing) throw new AppError('Đơn hàng không tồn tại', 404);
@@ -282,9 +331,57 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
     if (!hasMyProduct) {
       throw new AppError('Đơn hàng không chứa sản phẩm của bạn', 403);
     }
-    const partnerAllowed = ['CONFIRMED', 'SHIPPING', 'DELIVERED'];
+    const partnerAllowed = ['CONFIRMED', 'SHIPPING', 'DELIVERED', 'CANCELLED'];
     if (!partnerAllowed.includes(status)) {
       throw new AppError('Bạn không thể chuyển đơn hàng sang trạng thái này', 400);
+    }
+
+    // Nếu partner từ chối đơn → CANCELLED + hoàn tồn kho (tất cả sản phẩm)
+    if (status === 'CANCELLED') {
+      await prisma.$transaction(async (tx) => {
+        // Hoàn lại tồn kho cho TẤT CẢ sản phẩm trong đơn
+        for (const item of existing.orderItems) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: {
+              stock: { increment: item.quantity },
+              soldCount: { decrement: item.quantity },
+            },
+          });
+        }
+
+        // Hoàn coupon — toàn bộ đơn bị hủy nên coupon luôn được hoàn
+        if (existing.couponId) {
+          await tx.coupon.update({
+            where: { id: existing.couponId },
+            data: { usedCount: { decrement: 1 } },
+          });
+          await tx.couponUsage.deleteMany({
+            where: { couponId: existing.couponId, orderId: id },
+          });
+        }
+
+        await tx.order.update({
+          where: { id },
+          data: { status: 'CANCELLED' },
+        });
+      });
+
+      // Thông báo cho khách hàng
+      await prisma.notification.create({
+        data: {
+          type: 'ORDER',
+          title: 'Đơn hàng bị từ chối',
+          message: `Đơn hàng #${id.slice(0, 8)} đã bị đối tác từ chối. Tiền sẽ được hoàn lại trong 1-3 ngày làm việc.`,
+          referenceId: id,
+        },
+      });
+
+      const order = await prisma.order.findUnique({
+        where: { id },
+        include: { orderItems: true },
+      });
+      return res.json({ success: true, data: order, message: 'Đã từ chối đơn hàng' });
     }
   }
 
@@ -299,6 +396,23 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
     await prisma.notification.updateMany({
       where: { referenceId: id, type: 'ORDER', isRead: false },
       data: { isRead: true },
+    });
+  }
+
+  // Gửi thông báo cho khách hàng khi trạng thái đơn thay đổi
+  if (['CONFIRMED', 'SHIPPING', 'DELIVERED'].includes(status)) {
+    const statusLabels = {
+      CONFIRMED: 'đã được xác nhận',
+      SHIPPING: 'đang được giao',
+      DELIVERED: 'đã giao thành công',
+    };
+    await prisma.notification.create({
+      data: {
+        type: 'ORDER',
+        title: 'Cập nhật đơn hàng',
+        message: `Đơn hàng #${id.slice(0, 8)} ${statusLabels[status] || status}.`,
+        referenceId: id,
+      },
     });
   }
 

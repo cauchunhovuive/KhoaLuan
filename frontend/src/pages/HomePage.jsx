@@ -9,6 +9,7 @@ import {
 import { fetchFeaturedProducts, fetchCategories } from '../store/productSlice';
 import ProductCard from '../components/common/ProductCard';
 import BannerSlider from '../components/common/BannerSlider';
+
 import LazySection from '../components/common/LazySection';
 import api from '../services/api';
 
@@ -214,55 +215,92 @@ const HomePage = () => {
 
   return (
     <div className="overflow-hidden">
-      {/* ═══════════════ HERO ═══════════════ */}
-      <div className="relative">
-        {/* Animated background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary-800 via-primary-900 to-[#0f0a2e] overflow-hidden">
-          <div className="absolute -top-40 -right-32 w-96 h-96 rounded-full bg-primary-500/20 blur-[100px] animate-breathe" />
-          <div className="absolute -bottom-48 -left-32 w-[500px] h-[500px] rounded-full bg-violet-500/15 blur-[120px] animate-breathe" style={{ animationDelay: '2s' }} />
-          <div className="absolute top-1/3 left-1/2 w-64 h-64 rounded-full bg-amber-500/8 blur-[80px] animate-breathe" style={{ animationDelay: '4s' }} />
-        </div>
-
-        {/* BannerSlider on dark background */}
-        <div className="relative z-10">
-          <BannerSlider />
-        </div>
-
-        {/* ML status pill floating */}
-        {mlHealthy && (
-          <div className="relative z-20 -mt-10 flex justify-center">
-            <div className="inline-flex items-center px-4 py-2 bg-white/90 backdrop-blur-xl rounded-full shadow-premium-lg border border-white/80 text-xs font-medium text-ink-secondary animate-fadeSlideUp">
-              <FiZap className="text-primary-500 mr-2" />
-              <span>AI Gợi ý đang hoạt động</span>
-              <span className="w-1.5 h-1.5 bg-green-500 rounded-full ml-2 animate-pulse-soft" />
+      {/* ═══════════════ HERO SECTION ═══════════════ */}
+      <section className="relative overflow-hidden bg-gradient-to-b from-primary-900 via-primary-800 to-primary-900 min-h-[750px] md:min-h-[850px] lg:min-h-[950px] flex items-center">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(99,102,241,0.15),transparent_50%),radial-gradient(ellipse_at_bottom_left,rgba(139,92,246,0.1),transparent_50%)]" />
+        <div className="relative w-full">
+          <div className="flex flex-col h-full">
+            {/* BannerSlider */}
+            <div className="flex-shrink-0">
+              <BannerSlider />
             </div>
+
+            {/* Center: Badge + Headline + CTA buttons */}
+            <div className="flex-1 flex flex-col items-center justify-center text-center px-4 py-4">
+              <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-white/80 text-[10px] font-semibold uppercase tracking-[0.15em] mb-4 animate-fade-in">
+                <span className="w-1.5 h-1.5 bg-primary-400 rounded-full mr-2 animate-pulse-soft" />
+                Nền tảng thương mại AI
+              </div>
+
+              <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold text-white leading-[1.1] tracking-tight max-w-3xl animate-slide-up">
+                Mua sắm{' '}
+                <span className="bg-gradient-to-r from-primary-300 via-primary-400 to-violet-400 bg-clip-text text-transparent">
+                  thông minh
+                </span>
+                <br />
+                với AI
+              </h1>
+
+              <p className="text-base md:text-lg text-white/60 mt-3 max-w-xl leading-relaxed animate-slide-up" style={{animationDelay:'0.15s'}}>
+                Hệ thống gợi ý thông minh dựa trên hành vi, sở thích và xu hướng thị trường
+              </p>
+
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-5 animate-slide-up" style={{animationDelay:'0.3s'}}>
+                <Link
+                  to="/products"
+                  className="group relative overflow-hidden inline-flex items-center px-7 py-3 bg-white text-primary-700 rounded-2xl font-semibold hover:bg-primary-50 active:scale-[0.97] transition-all duration-300 shadow-premium-xl hover:shadow-premium-2xl text-sm"
+                >
+                  <span className="absolute inset-0 bg-gradient-to-r from-transparent via-primary-100/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+                  <span className="relative">Khám phá ngay</span>
+                  <FiArrowRight className="relative ml-2 group-hover:translate-x-1 transition-transform duration-300" />
+                </Link>
+                <Link
+                  to="/flash-sales"
+                  className="inline-flex items-center px-7 py-3 border-2 border-white/20 text-white rounded-2xl font-medium hover:bg-white/10 hover:border-white/30 active:scale-[0.97] transition-all duration-300 text-sm"
+                >
+                  <span className="w-1.5 h-1.5 bg-red-400 rounded-full mr-2 animate-pulse-soft" />
+                  Flash Sale hôm nay
+                </Link>
+              </div>
+            </div>
+
+            {/* ML status pill */}
+            <div className="flex justify-center mb-2">
+              {mlHealthy && (
+                <div className="inline-flex items-center px-4 py-2 bg-white/90 backdrop-blur-xl rounded-full shadow-premium-lg border border-white/80 text-xs font-medium text-ink-secondary">
+                  <FiZap className="text-primary-500 mr-2" />
+                  <span>AI Gợi ý đang hoạt động</span>
+                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full ml-2 animate-pulse-soft" />
+                </div>
+              )}
+            </div>
+
+            {/* Floating stat pills */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 max-w-5xl mx-auto w-full px-4">
+            {[
+              { icon: FiZap, label: 'AI Gợi ý', sub: 'Thông minh', color: 'from-violet-500 to-fuchsia-600' },
+              { icon: FiShoppingBag, label: 'Sản phẩm', sub: 'Đa dạng', color: 'from-emerald-500 to-emerald-600' },
+              { icon: FiShield, label: 'Bảo mật', sub: 'Tuyệt đối', color: 'from-blue-500 to-indigo-600' },
+              { icon: FiClock, label: 'Giao hàng', sub: 'Siêu tốc', color: 'from-amber-500 to-orange-600' },
+            ].map((pill, i) => (
+              <div
+                key={i}
+                className="group flex items-center space-x-3 bg-white/80 backdrop-blur-xl rounded-2xl px-4 py-3.5 shadow-premium-lg border border-white/60 hover:shadow-premium-xl hover:-translate-y-0.5 transition-all duration-300"
+                style={{ animation: `fadeSlideUp 0.6s ${0.1 + i * 0.08}s both` }}
+              >
+                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${pill.color} flex items-center justify-center shadow-lg shrink-0`}>
+                  <pill.icon className="text-white text-sm" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-ink">{pill.label}</p>
+                  <p className="text-[10px] text-ink-tertiary">{pill.sub}</p>
+                </div>
+              </div>
+            ))}
           </div>
-        )}
-
-        {/* Floating stat pills */}
-        <div className="relative z-20 max-w-7xl mx-auto px-6 md:px-12 -mt-6 grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-          {[
-            { icon: FiZap, label: 'AI Gợi ý', sub: 'Thông minh', color: 'from-violet-500 to-fuchsia-600' },
-            { icon: FiShoppingBag, label: 'Sản phẩm', sub: 'Đa dạng', color: 'from-emerald-500 to-emerald-600' },
-            { icon: FiShield, label: 'Bảo mật', sub: 'Tuyệt đối', color: 'from-blue-500 to-indigo-600' },
-            { icon: FiClock, label: 'Giao hàng', sub: 'Siêu tốc', color: 'from-amber-500 to-orange-600' },
-          ].map((pill, i) => (
-            <div
-              key={i}
-              className="group flex items-center space-x-3 bg-white/80 backdrop-blur-xl rounded-2xl px-4 py-3.5 shadow-premium-lg border border-white/60 hover:shadow-premium-xl hover:-translate-y-0.5 transition-all duration-300"
-              style={{ animation: `fadeSlideUp 0.6s ${0.1 + i * 0.08}s both` }}
-            >
-              <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${pill.color} flex items-center justify-center shadow-lg shrink-0`}>
-                <pill.icon className="text-white text-sm" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-ink">{pill.label}</p>
-                <p className="text-[10px] text-ink-tertiary">{pill.sub}</p>
-              </div>
-            </div>
-          ))}
+          </div>
         </div>
-      </div>
+      </section>
 
       {/* ═══════════════ SEASONAL / EVENT RECOMMENDATIONS ═══════════════ */}
       {(seasonalRecs.length > 0 || seasonalLoading) && (

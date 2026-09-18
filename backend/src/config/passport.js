@@ -28,6 +28,10 @@ const generateRefreshToken = (userId) => {
   });
 };
 
+// Chỉ kích hoạt Google OAuth nếu có đủ credentials
+if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+  console.warn('⚠️  Google OAuth chưa được cấu hình. Bỏ qua Google Strategy.');
+} else {
 passport.use(
   new GoogleStrategy(
     {
@@ -159,5 +163,6 @@ passport.deserializeUser(async (id, done) => {
     done(error, null);
   }
 });
+}
 
 module.exports = passport;

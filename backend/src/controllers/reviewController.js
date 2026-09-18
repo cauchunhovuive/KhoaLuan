@@ -104,6 +104,52 @@ const createReview = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, data: review });
 });
 
+// @desc    Update review (edit existing review)
+// @route   PUT /api/reviews/:id
+const updateReview = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { rating, comment } = req.body;
+
+  const review = await prisma.review.findUnique({ where: { id } });
+  if (!review) throw new AppError('Đánh giá không tồn tại', 404);
+  if (review.userId !== req.user.id) {
+    throw new AppError('Bạn không có quyền sửa đánh giá này', 403);
+  }
+
+  if (rating !== undefined && (rating < 1 || rating > 5)) {
+    throw new AppError('Điểm đánh giá phải từ 1-5', 400);
+  }
+
+  const data = {};
+  if (rating !== undefined) data.rating = rating;
+  if (comment !== undefined) data.comment = comment;
+
+  const updated = await prisma.review.update({
+    where: { id },
+    data,
+    include: { user: { select: { id: true, name: true, avatar: true } } },
+  });
+
+  // Re-calculate product rating
+  const aggregation = await prisma.review.aggregate({
+    where: { productId: review.productId },
+    _avg: { rating: true },
+    _count: true,
+  });
+
+  await prisma.product.update({
+    where: { id: review.productId },
+    data: {
+      rating: aggregation._avg.rating,
+      reviewCount: aggregation._count,
+    },
+  });
+
+  await cacheDel(`product:${review.productId}`);
+
+  res.json({ success: true, data: updated, message: 'Đã cập nhật đánh giá' });
+});
+
 // @desc    Delete review
 // @route   DELETE /api/reviews/:id
 const deleteReview = asyncHandler(async (req, res) => {
@@ -232,4 +278,4 @@ const getPartnerReviews = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { getProductReviews, createReview, deleteReview, replyReview, getPartnerReviews };
+module.exports = { getProductReviews, createReview, updateReview, deleteReview, replyReview, getPartnerReviews };

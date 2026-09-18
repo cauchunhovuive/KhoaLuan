@@ -5,7 +5,7 @@ import {
   FiHome, FiPackage, FiGrid, FiUsers,
   FiPieChart, FiTrendingUp, FiSettings, FiLogOut,
   FiMenu, FiChevronLeft, FiBell, FiCheck, FiClock,
-  FiUserCheck, FiTag, FiImage, FiZap, FiRefreshCw, FiAlertTriangle, FiFileText, FiBarChart2, FiActivity,
+  FiUserCheck, FiTag, FiImage, FiZap, FiRefreshCw, FiAlertTriangle, FiFileText, FiBarChart2, FiActivity, FiBookOpen,
 } from 'react-icons/fi';
 import { logout } from '../../store/authSlice';
 import { fetchNotifications, markAsRead, markAllAsRead } from '../../store/notificationSlice';
@@ -26,6 +26,7 @@ const sidebarItems = [
   { icon: FiTrendingUp, label: 'Gợi ý', path: '/admin/recommendations' },
   { icon: FiBarChart2, label: 'A/B Test', path: '/admin/abtest' },
   { icon: FiActivity, label: 'Kiểm tra ML', path: '/admin/ml-test' },
+  { icon: FiBookOpen, label: 'Demo bài báo', path: '/admin/paper-demo' },
   { icon: FiSettings, label: 'Cài đặt', path: '/admin/settings' },
 ];
 

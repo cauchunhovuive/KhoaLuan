@@ -97,15 +97,8 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-br from-primary-50 via-white to-primary-100 flex items-center justify-center px-4 py-12 relative overflow-hidden">
-      {/* Background decoration */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-primary-200/30 blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-primary-300/20 blur-3xl" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-primary-400/5 blur-3xl" />
-      </div>
-
-      <div className="w-full max-w-md relative animate-fade-in">
+    <div className="min-h-[100dvh] flex items-center justify-center px-4 py-12 relative overflow-hidden bg-gradient-to-b from-surface-secondary to-white">
+      <div className="w-full max-w-md relative z-10 animate-fade-in">
         {/* Logo */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center space-x-2.5 group">

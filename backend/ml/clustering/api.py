@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import uvicorn
 import logging
+import time
 import numpy as np
 import sys
 import os
@@ -23,10 +24,28 @@ from collaborative.collaborative_filtering import (
     ItemItemCF, UserUserCF, ALSMatrixFactorization, HybridRecommender,
     CFConfig, build_user_product_matrix,
 )
+from collaborative.graph_cf import GraphCFRecommender
+
+# LightGCN-CF cần PyTorch — nếu chưa cài torch, ML Service vẫn chạy bình thường
+# và endpoint /lightgcncf/* sẽ trả lỗi rõ ràng (không sập toàn bộ service).
+try:
+    from collaborative.lightgcn_cf import LightGCNCFDataset, LightGCNCFRecommender
+    LIGHTGCN_AVAILABLE = True
+except ImportError:
+    LightGCNCFDataset = None
+    LightGCNCFRecommender = None
+    LIGHTGCN_AVAILABLE = False
+    logging.getLogger(__name__).warning(
+        "PyTorch (torch) chưa được cài — LightGCN-CF sẽ không khả dụng. "
+        "Cài bằng: pip install torch"
+    )
+
 from session.session_recommender import (
     SessionRecommender, CoOccurrenceMatrix, SequenceBasedRecommender,
     SessionConfig, build_sessions_from_views,
 )
+from session.benchmark_hsp_ric import load_yoochoose, load_diginetica, compute_mrr_recall
+import session.benchmark_hsp_ric as _bench_mod
 from rag.knowledge_base import KnowledgeBase
 from evaluation.metrics import (
     RecommendationMetrics, ABTestFramework, EvaluationResult,
@@ -123,7 +142,8 @@ class SessionRecommendRequest(BaseModel):
     view_logs: Optional[List[SessionViewLog]] = None
     products: List[ProductBrief]
     top_n: Optional[int] = 10
-    strategy: Optional[str] = "hybrid"  # hybrid, cooccurrence, sequence, popularity
+    strategy: Optional[str] = "hybrid"  # hybrid, cooccurrence, sequence, hsp, ric, ric_cil, popularity
+    alpha: Optional[float] = None       # forgetting factor cho RIC (0.1–0.9, mặc định 0.5)
 
 class TrainSessionRequest(BaseModel):
     view_logs: List[SessionViewLog]
@@ -176,6 +196,8 @@ user_cf = None
 als_model = None
 hybrid = None
 session_rec = None
+graph_cf = None
+lightgcn_cf = None
 ab_test = None
 rag_service_instance = None
 kb_instance = None
@@ -253,6 +275,70 @@ def get_session_recommender(view_logs: List[Dict]):
     return session_rec
 
 
+def get_graph_cf_models(
+    orders_data: List[Dict],
+    products_data: List[Dict],
+    config: Optional[Dict] = None,
+):
+    """Lazy init hoặc huấn luyện lại Graph CF (LightGCN-like, không cần PyTorch)."""
+    global graph_cf
+
+    n_layers = (config or {}).get('n_layers', 3)
+    latent_dim = (config or {}).get('latent_dim', 64)
+
+    matrix, user_ids, product_ids = build_user_product_matrix(orders_data, products_data)
+
+    graph_cf = GraphCFRecommender(n_layers=n_layers, latent_dim=latent_dim)
+    graph_cf.fit(
+        user_item_matrix=matrix,
+        user_ids=user_ids,
+        product_ids=product_ids,
+    )
+
+    logger.info(
+        f"Graph CF trained: {len(user_ids)} users x {len(product_ids)} products, "
+        f"{n_layers} layers"
+    )
+    return graph_cf
+
+
+def get_lightgcn_cf_models(
+    orders_data: List[Dict],
+    products_data: List[Dict],
+    config: Optional[Dict] = None,
+):
+    """Lazy init hoặc huấn luyện lại LightGCN-CF (PyTorch, BPR loss)."""
+    global lightgcn_cf
+
+    if not LIGHTGCN_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="LightGCN-CF cần PyTorch. Cài bằng: pip install torch (môi trường ML service)",
+        )
+
+    cfg = config or {}
+    matrix, user_ids, product_ids = build_user_product_matrix(orders_data, products_data)
+
+    dataset = LightGCNCFDataset.from_matrix(matrix, user_ids, product_ids)
+
+    lightgcn_cf = LightGCNCFRecommender(
+        latent_dim=cfg.get('latent_dim', 32),
+        n_layers=cfg.get('n_layers', 2),
+        epochs=cfg.get('epochs', 10),
+        batch_size=cfg.get('batch_size', 2048),
+        lr=cfg.get('lr', 0.005),
+        reg=cfg.get('reg', 1e-4),
+        fusion_init=cfg.get('fusion_init', 0.5),
+        sim_k=cfg.get('sim_k', 20),
+    )
+    lightgcn_cf.fit(dataset)
+
+    logger.info(
+        f"LightGCN-CF trained: {len(user_ids)} users x {len(product_ids)} products"
+    )
+    return lightgcn_cf
+
+
 def get_ab_test():
     global ab_test
     if ab_test is None:
@@ -296,11 +382,25 @@ async def service_info():
                     "/cf/recommend/hybrid", "/cf/explain",
                 ],
             },
+            "graph_cf": {
+                "description": "Graph CF nhẹ (LightGCN-like, numpy/scipy, không cần PyTorch) — Li & Zhang 2025",
+                "endpoints": [
+                    "/graphcf/train", "/graphcf/recommend",
+                ],
+            },
+            "lightgcn_cf": {
+                "description": "LightGCN-CF hybrid (PyTorch, GCN + CF + learnable fusion weight, BPR) — Li & Zhang 2025",
+                "endpoints": [
+                    "/lightgcncf/train", "/lightgcncf/recommend",
+                ],
+                "available": LIGHTGCN_AVAILABLE,
+            },
             "session_based": {
-                "description": "Co-occurrence + Sequence-based session recommendations",
+                "description": "Co-occurrence + Sequence + HSP + RIC (Delianidi et al. 2023) session recommendations",
                 "endpoints": [
                     "/session/train", "/session/recommend",
                 ],
+                "strategies": ["cooccurrence", "sequence", "hsp", "ric", "ric_cil", "hybrid", "popularity"],
             },
             "evaluation": {
                 "description": "Metrics computation and A/B testing framework",
@@ -719,6 +819,176 @@ async def explain_recommendations(request: CFRecommendRequest):
 
 
 # ============================================================
+# Graph CF Endpoints (LightGCN-like, no PyTorch) — Li & Zhang 2025
+# ============================================================
+
+class GraphCFRequest(BaseModel):
+    orders: List[OrderItemData]
+    products: List[ProductBrief]
+    config: Optional[Dict[str, Any]] = None
+
+class GraphCFRecommendRequest(BaseModel):
+    user_id: str
+    orders: List[OrderItemData]
+    products: List[ProductBrief]
+    top_n: Optional[int] = 10
+    config: Optional[Dict[str, Any]] = None
+
+
+@app.post("/graphcf/train")
+async def train_graph_cf(request: GraphCFRequest):
+    """Huấn luyện Graph CF nhẹ (LightGCN-like propagation, numpy/scipy)"""
+    try:
+        orders_data = [
+            {'user_id': o.user_id, 'product_id': o.product_id, 'quantity': o.quantity}
+            for o in request.orders
+        ]
+        products_data = [p.dict() for p in request.products]
+
+        get_graph_cf_models(orders_data, products_data, request.config)
+
+        return {
+            "success": True,
+            "data": {
+                "message": "Graph CF trained successfully (LightGCN-like, numpy/scipy)",
+                "n_orders": len(orders_data),
+                "n_products": len(products_data),
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Graph CF training failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/graphcf/recommend")
+async def recommend_graph_cf(request: GraphCFRecommendRequest):
+    """Gợi ý bằng Graph CF nhẹ (lan truyền tín hiệu cộng tác trên đồ thị)"""
+    try:
+        orders_data = [
+            {'user_id': o.user_id, 'product_id': o.product_id, 'quantity': o.quantity}
+            for o in request.orders
+        ]
+        products_data = [p.dict() for p in request.products]
+
+        get_graph_cf_models(orders_data, products_data, request.config)
+
+        # Xác định sản phẩm đã mua để exclude
+        user_products = set(
+            o['product_id'] for o in orders_data if o['user_id'] == request.user_id
+        )
+
+        recs = graph_cf.recommend(
+            request.user_id, request.top_n, list(user_products)
+        )
+
+        return {
+            "success": True,
+            "data": {
+                "user_id": request.user_id,
+                "strategy": "graph_cf",
+                "recommendations": recs,
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Graph CF recommendation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
+# LightGCN-CF Endpoints (PyTorch, hybrid GCN + CF) — Li & Zhang 2025
+# ============================================================
+
+class LightGCNCFRequest(BaseModel):
+    orders: List[OrderItemData]
+    products: List[ProductBrief]
+    config: Optional[Dict[str, Any]] = None
+
+class LightGCNCFRecommendRequest(BaseModel):
+    user_id: str
+    orders: List[OrderItemData]
+    products: List[ProductBrief]
+    top_n: Optional[int] = 10
+    config: Optional[Dict[str, Any]] = None
+
+
+@app.post("/lightgcncf/train")
+async def train_lightgcn_cf(request: LightGCNCFRequest):
+    """
+    Huấn luyện LightGCN-CF hybrid (PyTorch).
+
+    Kết hợp LightGCN backbone + CF module (pseudo-interactions cold-start)
+    + learnable fusion weight, tối ưu bằng BPR loss.
+    config: {latent_dim, n_layers, epochs, batch_size, lr, reg, fusion_init, sim_k}
+    """
+    try:
+        orders_data = [
+            {'user_id': o.user_id, 'product_id': o.product_id, 'quantity': o.quantity}
+            for o in request.orders
+        ]
+        products_data = [p.dict() for p in request.products]
+
+        get_lightgcn_cf_models(orders_data, products_data, request.config)
+
+        return {
+            "success": True,
+            "data": {
+                "message": "LightGCN-CF trained successfully (PyTorch, BPR loss)",
+                "n_orders": len(orders_data),
+                "n_products": len(products_data),
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"LightGCN-CF training failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/lightgcncf/recommend")
+async def recommend_lightgcn_cf(request: LightGCNCFRecommendRequest):
+    """
+    Gợi ý bằng LightGCN-CF hybrid.
+
+    Điểm cuối = w * gcn_score + (1 - w) * cf_score với w là trọng số fusion
+    học được trong quá trình huấn luyện BPR.
+    """
+    try:
+        orders_data = [
+            {'user_id': o.user_id, 'product_id': o.product_id, 'quantity': o.quantity}
+            for o in request.orders
+        ]
+        products_data = [p.dict() for p in request.products]
+
+        get_lightgcn_cf_models(orders_data, products_data, request.config)
+
+        user_products = set(
+            o['product_id'] for o in orders_data if o['user_id'] == request.user_id
+        )
+
+        recs = lightgcn_cf.recommend(
+            request.user_id, request.top_n, list(user_products)
+        )
+
+        return {
+            "success": True,
+            "data": {
+                "user_id": request.user_id,
+                "strategy": "lightgcn_cf",
+                "recommendations": recs,
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"LightGCN-CF recommendation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
 # Session-Based Endpoints (NEW)
 # ============================================================
 
@@ -772,6 +1042,7 @@ async def recommend_session(request: SessionRecommendRequest):
             request.session_items,
             request.top_n,
             strategy=request.strategy,
+            alpha=request.alpha,
         )
         
         return {
@@ -792,6 +1063,170 @@ async def recommend_session(request: SessionRecommendRequest):
 # ============================================================
 # Evaluation Endpoints (NEW)
 # ============================================================
+
+# --- Paper benchmark state (giữ model Yoochoose giữa các lần gọi) ---
+_paper_model = None        # SessionRecommender đã fit trên Yoochoose
+_paper_stats_cache = None  # stats dataset (tính 1 lần)
+
+
+def _load_paper_stats():
+    """Thống kê dataset Yoochoose (dataset bài báo Delianidi 2023)."""
+    global _paper_stats_cache
+    if _paper_stats_cache is not None:
+        return _paper_stats_cache
+    try:
+        train_sessions, test_samples = load_yoochoose()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+    n_items = len({it for s in train_sessions for it in s['items']})
+    total_clicks = sum(len(s['items']) for s in train_sessions)
+    avg_len = total_clicks / max(len(train_sessions), 1)
+
+    _paper_stats_cache = {
+        "dataset": "Yoochoose (RecSys Challenge 2015)",
+        "paper": "Delianidi et al., Applied Sciences 13(1):394, 2023",
+        "n_train_sessions": len(train_sessions),
+        "n_test_samples": len(test_samples),
+        "n_products": n_items,
+        "total_clicks": total_clicks,
+        "avg_session_length": round(avg_len, 2),
+        "sample_sessions": [
+            {"session_id": s['session_id'], "items": s['items'][:8]}
+            for s in train_sessions if len(s['items']) >= 4
+        ][:5],
+    }
+    return _paper_stats_cache
+
+
+@app.get("/session/paper-data")
+async def get_paper_data():
+    """Thống kê dataset Yoochoose dùng cho benchmark bài báo (hiển thị trên web admin)."""
+    stats = _load_paper_stats()
+    return {"success": True, "data": stats}
+
+
+class PaperBenchmarkRequest(BaseModel):
+    max_test: Optional[int] = 500
+
+
+class PaperRecommendRequest(BaseModel):
+    session_items: List[str]
+    top_n: Optional[int] = 10
+    strategy: Optional[str] = "hybrid"
+    alpha: Optional[float] = None
+
+
+@app.post("/session/paper-recommend")
+async def paper_recommend(request: PaperRecommendRequest):
+    """
+    Gợi ý bằng model train sẵn trên dataset Yoochoose (bài báo Delianidi 2023).
+    Model ẩn danh (chỉ có mã số item) — dùng để minh họa chất lượng model
+    học từ 375k phiên thật, độc lập với dữ liệu shop.
+    """
+    global _paper_model
+    if _paper_model is None:
+        train_sessions, _ = load_yoochoose()
+        t0 = time.perf_counter()
+        rec = SessionRecommender(SessionConfig(top_n=30))
+        rec.fit(train_sessions)
+        _paper_model = rec
+        logger.info(f"Paper model trained in {time.perf_counter() - t0:.2f}s (lazy)")
+
+    recs = _paper_model.recommend(
+        request.session_items,
+        request.top_n,
+        strategy=request.strategy,
+        alpha=request.alpha,
+    )
+    return {
+        "success": True,
+        "data": {
+            "source": "yoochoose",
+            "strategy": request.strategy,
+            "recommendations": recs,
+        },
+    }
+
+
+@app.post("/session/benchmark/reset")
+async def reset_paper_benchmark():
+    """Xóa model + stats Yoochoose đang cache — lần benchmark sau sẽ train lại từ đầu."""
+    global _paper_model, _paper_stats_cache
+    had_model = _paper_model is not None
+    _paper_model = None
+    _paper_stats_cache = None
+    logger.info(f"Paper benchmark reset (had_cached_model={had_model})")
+    return {
+        "success": True,
+        "data": {
+            "message": "Đã reset — lần benchmark sau sẽ train lại từ đầu trên 375k phiên",
+            "had_cached_model": had_model,
+        },
+    }
+
+
+@app.post("/session/benchmark")
+async def run_paper_benchmark(request: PaperBenchmarkRequest):
+    """
+    Chạy benchmark HSP & RIC trực tiếp trên Yoochoose (dataset bài báo).
+    Lần đầu train trên 375k phiên (~11s), các lần sau dùng lại model.
+    Trả về bảng MRR@K / Recall@K theo đúng protocol bài báo.
+    """
+    global _paper_model
+    max_test = max(10, min(request.max_test or 500, 5000))
+
+    train_sessions, test_samples = load_yoochoose()
+
+    if _paper_model is None:
+        t0 = time.perf_counter()
+        rec = SessionRecommender(SessionConfig(top_n=30))
+        rec.fit(train_sessions)
+        _paper_model = rec
+        train_time = time.perf_counter() - t0
+    else:
+        train_time = 0.0  # đã train từ lần trước
+
+    methods = ['cooccurrence', 'sequence', 'hsp', 'ric', 'ric_cil']
+    rows = []
+    ks = [10, 20, 30]
+    for method in methods:
+        t1 = time.perf_counter()
+        metrics = _bench_mod.evaluate_model(_paper_model, method, test_samples, max_test, ks)
+        elapsed = time.perf_counter() - t1
+        rows.append({
+            "method": method,
+            "mrr@10": metrics['mrr@10'], "mrr@20": metrics['mrr@20'], "mrr@30": metrics['mrr@30'],
+            "recall@10": metrics['recall@10'], "recall@20": metrics['recall@20'], "recall@30": metrics['recall@30'],
+            "n_evaluated": metrics['n_evaluated'],
+            "eval_seconds": round(elapsed, 1),
+        })
+
+    # Tuning alpha cho RIC (như cuối benchmark CLI)
+    alpha_rows = []
+    for alpha in [0.1, 0.3, 0.5, 0.7, 0.9]:
+        metrics = _bench_mod.evaluate_model(
+            _paper_model, 'ric_cil', test_samples, min(max_test, 2000), [10, 20], alpha=alpha)
+        alpha_rows.append({
+            "alpha": alpha,
+            "mrr@10": metrics['mrr@10'], "recall@10": metrics['recall@10'],
+            "mrr@20": metrics['mrr@20'], "recall@20": metrics['recall@20'],
+        })
+
+    return {
+        "success": True,
+        "data": {
+            "dataset": "Yoochoose",
+            "n_train_sessions": len(train_sessions),
+            "n_test_samples": len(test_samples),
+            "max_test": max_test,
+            "train_seconds": round(train_time, 2),
+            "cached_model": _paper_model is not None and train_time == 0.0,
+            "rows": rows,
+            "alpha_tuning": alpha_rows,
+        },
+    }
+
 
 @app.post("/evaluate/offline")
 async def evaluate_offline(request: EvaluateRequest):

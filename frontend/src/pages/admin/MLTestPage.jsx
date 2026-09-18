@@ -7,15 +7,36 @@ const TESTS = [
   { key: 'health', label: 'ML Health', icon: FiCpu, endpoint: 'GET /api/ml/health' },
   { key: 'trainSession', label: 'Train Session', icon: FiClock, endpoint: 'POST /api/ml/session/train' },
   { key: 'trainCF', label: 'Train CF Model', icon: FiZap, endpoint: 'POST /api/ml/cf/train' },
+  { key: 'graphcfTrain', label: 'Train Graph CF', icon: FiLayers, endpoint: 'POST /api/ml/graphcf/train' },
+  { key: 'lightgcnTrain', label: 'Train LightGCN-CF', icon: FiCpu, endpoint: 'POST /api/ml/lightgcncf/train' },
   { key: 'evaluate', label: 'Evaluate Models', icon: FiBarChart2, endpoint: 'POST /api/ml/evaluate' },
   { key: 'cluster', label: 'Run Clustering', icon: FiLayers, endpoint: 'POST /api/clusters/run' },
   { key: 'trending', label: 'Trending Products', icon: FiTrendingUp, endpoint: 'GET /api/recommendations/trending' },
   { key: 'sessionRec', label: 'Session Recommend', icon: FiActivity, endpoint: 'POST /api/ml/session/recommend' },
+  { key: 'sessionRic', label: 'Session Recommend (RIC)', icon: FiBarChart2, endpoint: 'POST /api/ml/session/recommend (strategy=ric)' },
+  { key: 'graphcfRec', label: 'Graph CF Recommend', icon: FiActivity, endpoint: 'POST /api/ml/graphcf/recommend' },
+  { key: 'lightgcnRec', label: 'LightGCN-CF Recommend', icon: FiCpu, endpoint: 'POST /api/ml/lightgcncf/recommend' },
   { key: 'explain', label: 'Explain Recs', icon: FiSend, endpoint: 'POST /api/ml/explain' },
   { key: 'abtestLog', label: 'A/B Test Log', icon: FiShoppingBag, endpoint: 'POST /api/ml/abtest/log' },
   { key: 'abtestCompare', label: 'A/B Test Compare', icon: FiBarChart2, endpoint: 'POST /api/ml/abtest/compare' },
   { key: 'abtestReport', label: 'A/B Test Report', icon: FiServer, endpoint: 'GET /api/ml/abtest/report' },
 ];
+
+const getSampleCustomer = async () => {
+  // Ưu tiên khách hàng CÓ đơn hàng (kết quả gợi ý luôn có ý nghĩa)
+  try {
+    const { data } = await api.get('/users/with-orders');
+    const customers = data?.data || [];
+    if (customers.length > 0) return customers[0].id;
+  } catch (e) { /* fallback bên dưới */ }
+  try {
+    const { data: custData } = await api.get('/users?role=CUSTOMER&limit=1');
+    const customers = custData?.data?.users || custData?.users || [];
+    return customers[0]?.id || null;
+  } catch (e) {
+    return null;
+  }
+};
 
 const MLTestPage = () => {
   const [results, setResults] = useState({});
@@ -44,6 +65,41 @@ const MLTestPage = () => {
         case 'trainCF': {
           const { data } = await api.post('/ml/cf/train');
           res = { success: data.success && data.data?.trained, details: `${data.data?.n_orders || 0} orders, ${data.data?.models?.length || 0} models`, ms: Math.round(performance.now() - start) };
+          break;
+        }
+        case 'graphcfTrain': {
+          const { data } = await api.post('/ml/graphcf/train');
+          res = { success: data.success && data.data?.trained, details: `${data.data?.n_orders || 0} orders, ${data.data?.n_products || 0} products`, ms: Math.round(performance.now() - start) };
+          break;
+        }
+        case 'lightgcnTrain': {
+          const { data } = await api.post('/ml/lightgcncf/train');
+          res = { success: data.success && data.data?.trained, details: `${data.data?.n_orders || 0} orders, ${data.data?.n_products || 0} products`, ms: Math.round(performance.now() - start) };
+          break;
+        }
+        case 'graphcfRec': {
+          const customerId = await getSampleCustomer();
+          if (!customerId) { res = { success: false, details: 'No sample customer', ms: 0 }; break; }
+          const { data } = await api.post('/ml/graphcf/recommend', { userId: customerId, topN: 5 });
+          const recs = data?.data?.recommendations || [];
+          res = { success: recs.length > 0, details: `${recs.length} gợi ý`, top: recs.slice(0, 3).map(p => p.name).join(', '), ms: Math.round(performance.now() - start) };
+          break;
+        }
+        case 'lightgcnRec': {
+          const customerId = await getSampleCustomer();
+          if (!customerId) { res = { success: false, details: 'No sample customer', ms: 0 }; break; }
+          const { data } = await api.post('/ml/lightgcncf/recommend', { userId: customerId, topN: 5 });
+          const recs = data?.data?.recommendations || [];
+          res = { success: recs.length > 0, details: `${recs.length} gợi ý`, top: recs.slice(0, 3).map(p => p.name).join(', '), ms: Math.round(performance.now() - start) };
+          break;
+        }
+        case 'sessionRic': {
+          const { data: prodData } = await api.get('/products?limit=5');
+          const products = prodData?.data?.products || prodData?.products || [];
+          if (products.length < 2) { res = { success: false, details: 'Not enough products', ms: 0 }; break; }
+          const { data } = await api.post('/ml/session/recommend', { sessionItems: [products[0].id, products[1].id], topN: 5, strategy: 'ric' });
+          const recs = data?.data || [];
+          res = { success: recs.length > 0, details: `${recs.length} gợi ý (RIC)`, top: recs.slice(0, 3).map(p => p.name).join(', '), ms: Math.round(performance.now() - start) };
           break;
         }
         case 'evaluate': {
@@ -260,7 +316,7 @@ const MLTestPage = () => {
               </div>
               <p className="text-xs opacity-80 mt-1">
                 {failed === 0
-                  ? `✅ ${passed}/${total} test passed. ML Engine hoạt động ổn định với Session-based, Collaborative Filtering, Clustering, và A/B Testing.`
+                  ? `✅ ${passed}/${total} test passed. ML Engine ổn định: Session-based (HSP/RIC), CF, Graph-based (LightGCN-CF/Graph CF), Clustering, A/B Testing.`
                   : `⚠️ ${failed} test cần kiểm tra lại. Xem chi tiết từng test để biết nguyên nhân.`}
               </p>
             </div>

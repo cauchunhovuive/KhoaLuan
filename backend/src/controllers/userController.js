@@ -105,6 +105,38 @@ const deleteUser = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Người dùng đã bị vô hiệu hóa' });
 });
 
+// @desc    Get customers who have at least 1 non-cancelled order (for ML demo dropdown)
+// @route   GET /api/users/with-orders
+const getCustomersWithOrders = asyncHandler(async (req, res) => {
+  const users = await prisma.user.findMany({
+    where: {
+      role: 'CUSTOMER',
+      isActive: true,
+      orders: { some: { status: { not: 'CANCELLED' } } },
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      totalSpent: true,
+      _count: { select: { orders: { where: { status: { not: 'CANCELLED' } } } } },
+    },
+    orderBy: { totalSpent: 'desc' },
+    take: 50,
+  });
+
+  res.json({
+    success: true,
+    data: users.map(u => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      orderCount: u._count.orders,
+      totalSpent: u.totalSpent,
+    })),
+  });
+});
+
 // @desc    Follow a shop
 // @route   POST /api/users/follow
 const followShop = asyncHandler(async (req, res) => {
@@ -152,4 +184,4 @@ const getFollowedShops = asyncHandler(async (req, res) => {
   res.json({ success: true, data: shops });
 });
 
-module.exports = { getUsers, getUser, updateUser, deleteUser, followShop, unfollowShop, getFollowedShops };
+module.exports = { getUsers, getUser, updateUser, deleteUser, getCustomersWithOrders, followShop, unfollowShop, getFollowedShops };
