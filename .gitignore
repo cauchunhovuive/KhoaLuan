@@ -10,6 +10,7 @@ __pycache__/
 .python-version
 venv/
 .venv/
+.venv-pptx/
 .DS_Store
 coverage/
 .next/
@@ -37,6 +38,14 @@ backend/ml/__pycache__/
 backend/ml/**/*.pyc
 backend/ml/**/.pytest_cache/
 backend/ml/rag/data/
+
+# Downloaded benchmark datasets (tải lại được từ GitHub/Kaggle)
+backend/ml/datasets/*
+# Yoochoose (~9.5MB) — giữ trong repo để demo benchmark trực tiếp
+!backend/ml/datasets/yoochoose/
+backend/ml/datasets/yoochoose/*
+!backend/ml/datasets/yoochoose/train.txt
+!backend/ml/datasets/yoochoose/test.txt
 
 # Docker volumes
 postgres_data/
