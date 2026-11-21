@@ -3,7 +3,7 @@ import {
   FiSave, FiSliders, FiLoader, FiMail, FiMapPin, FiPhone as FiPhoneIcon,
   FiTruck, FiCpu, FiClock, FiPlay, FiCheckCircle, FiXCircle,
   FiRefreshCw, FiCalendar, FiActivity, FiZap, FiLayers, FiTrendingUp,
-  FiChevronRight, FiBarChart2, FiAlertCircle, FiInfo,
+  FiChevronRight, FiAlertCircle, FiInfo,
 } from 'react-icons/fi';
 import { useDispatch } from 'react-redux';
 import toast from 'react-hot-toast';
@@ -91,7 +91,6 @@ const SettingsPage = () => {
   // AI Auto-Run State
   const [aiTasks, setAiTasks] = useState({
     sessionTrain: { running: false, lastRun: null, status: null },
-    cfTrain: { running: false, lastRun: null, status: null },
     clustering: { running: false, lastRun: null, status: null },
   });
   const [runAllRunning, setRunAllRunning] = useState(false);
@@ -100,7 +99,6 @@ const SettingsPage = () => {
   // Auto-schedule intervals (minutes)
   const [schedules, setSchedules] = useState({
     sessionTrainInterval: 0,
-    cfTrainInterval: 0,
     clusteringInterval: 0,
   });
 
@@ -118,7 +116,6 @@ const SettingsPage = () => {
       if (data.data) {
         setSchedules({
           sessionTrainInterval: data.data.sessionTrainInterval || 0,
-          cfTrainInterval: data.data.cfTrainInterval || 0,
           clusteringInterval: data.data.clusteringInterval || 0,
         });
       }
@@ -169,13 +166,11 @@ const SettingsPage = () => {
 
     const endpoints = {
       sessionTrain: '/ml/session/train',
-      cfTrain: '/ml/cf/train',
       clustering: '/clusters/run',
     };
 
     const labels = {
       sessionTrain: 'Huấn luyện Session',
-      cfTrain: 'Huấn luyện CF',
       clustering: 'Phân cụm KH',
     };
 
@@ -232,7 +227,7 @@ const SettingsPage = () => {
 
   const runAllTasks = useCallback(async () => {
     setRunAllRunning(true);
-    const tasks = ['sessionTrain', 'cfTrain', 'clustering'];
+    const tasks = ['sessionTrain', 'clustering'];
     for (const task of tasks) {
       await runTask(task);
     }
@@ -315,15 +310,6 @@ const SettingsPage = () => {
               running={aiTasks.sessionTrain.running}
             />
             <AITaskCard
-              icon={FiBarChart2}
-              title="Huấn luyện CF Models"
-              description="Item-Item CF, User-User CF, ALS, Hybrid (98 orders, 101 products)"
-              taskKey="cfTrain"
-              lastRun={aiTasks.cfTrain.lastRun}
-              onRun={runTask}
-              running={aiTasks.cfTrain.running}
-            />
-            <AITaskCard
               icon={FiLayers}
               title="Phân cụm khách hàng"
               description="RFM Analysis + K-Means Clustering (15 khách hàng)"
@@ -343,16 +329,11 @@ const SettingsPage = () => {
                 Lưu cài đặt để áp dụng
               </span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <IntervalSelector
                 label="Session:"
                 value={schedules.sessionTrainInterval}
                 onChange={(v) => setSchedules(prev => ({ ...prev, sessionTrainInterval: Number(v) }))}
-              />
-              <IntervalSelector
-                label="CF:"
-                value={schedules.cfTrainInterval}
-                onChange={(v) => setSchedules(prev => ({ ...prev, cfTrainInterval: Number(v) }))}
               />
               <IntervalSelector
                 label="Cluster:"

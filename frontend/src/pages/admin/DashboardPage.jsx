@@ -525,11 +525,6 @@ const MLMetricsPanel = ({ mlHealth }) => {
 
       {/* Action Links */}
       <div className="flex items-center space-x-3">
-        <Link to="/admin/recommendations"
-          className="flex items-center space-x-1.5 text-xs font-medium text-primary-600 hover:text-primary-700 bg-primary-50 px-3.5 py-2 rounded-xl hover:bg-primary-100 transition-colors">
-          <FiTrendingUp className="text-xs" />
-          <span>Gợi ý sản phẩm</span>
-        </Link>
         <Link to="/admin/clusters"
           className="flex items-center space-x-1.5 text-xs font-medium text-violet-600 hover:text-violet-700 bg-violet-50 px-3.5 py-2 rounded-xl hover:bg-violet-100 transition-colors">
           <FiLayers className="text-xs" />

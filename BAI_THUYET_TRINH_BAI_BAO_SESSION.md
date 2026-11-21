@@ -34,7 +34,7 @@
 | Nguồn | Dữ liệu | Dùng để làm gì |
 |-------|---------|----------------|
 | **Hệ thống đồ án** | Bảng `ProductView` (PostgreSQL): mỗi lượt xem 1 dòng — ai, xem gì, lúc nào | Gợi ý trực tiếp trên web bán hàng |
-| **Bài báo / benchmark** | **Yoochoose** — 375,043 phiên mua sắm thật, 16,245 sản phẩm | Đo độ chính xác thuật toán |
+| **Bài báo / benchmark** | **Yoochoose** 375,043 phiên (RecSys 2015) + **Diginetica** 175,704 phiên (CIKM Cup 2016) — cả 2 đều trong repo | Đo độ chính xác thuật toán trên 2 dataset của bài báo |
 
 ### "Phiên" (session) là gì?
 
@@ -88,18 +88,27 @@ Bước 3  Gợi ý theo phiên hiện tại         POST /ml/session/recommend
 | 2 | Bấm chọn **iPhone 15** | Phiên = [iPhone] → chạy gợi ý: theo độ phổ biến (P0) |
 | 3 | Thêm **Ốp lưng iPhone 15** | Phiên = [iPhone → Ốp] → gợi ý **củ sạc** (P1) |
 | 4 | Thêm **Củ sạc 20W** | Bộ ba tin cậy (P2), tag màu P2/P1/P0 đổi theo từng bước |
-| 5 | Kéo slider **α từ 0.9 → 0.1** (RIC) | Thứ tự gợi ý đảo ngay — bộ nhớ quên tác động thật |
-| 6 | Bấm **"So sánh tất cả"** | 5 chiến lược chạy song song trên cùng phiên — bảng khác biệt |
+| 5 | Kéo xuống panel **"Bước 2 — Model đã học được gì?"** | **2 nguồn model**: shop → 8 phiên mẫu · bài báo → **bên trong model Yoochoose 375k phiên thật** (số item/cặp P1/bộ ba P2/cặp cùng phiên đã đếm, top P0, P1/P2/γ tra theo phiên với **phân số đếm thô**) — dòng xanh lá = món trong phiên có trong model |
+| 6 | Kéo slider **α từ 0.9 → 0.1** (RIC) | Thứ tự gợi ý đảo ngay — bộ nhớ quên tác động thật |
+| 7 | Kéo xuống panel **"Bước 4 — HSP theo từng bước"** | Bảng t=1,2,3: tag chuyển P0 → P1 → P2 — đúng chữ H = Hierarchical |
+| 8 | Kéo xuống panel **"Bước 5 — RIC bộ nhớ quên"** | 5a: mỗi gợi ý hiện **đầy đủ phép tính** w = α·w(t−1) + (1−α)·c (kèm γ) sau từng lượt xem · 5b: 3 giá trị α cạnh nhau |
+| 9 | Bấm **"So sánh tất cả"** (Bước 6) | 5 chiến lược chạy song song trên cùng phiên — bảng khác biệt |
+| 10 | Kéo xuống **"Bước 7 — Yoochoose & Diginetica"** | Data thật của cả 2 dataset bài báo (tab chuyển đổi) + chạy benchmark MRR/Recall live trên từng dataset |
+
+> 💡 Từ phiên bản hiện tại, trang **tự động chạy gợi ý** khi bấm sản phẩm hoặc kéo α (không cần bấm nút "Chạy gợi ý" từng lần) — giữ nhịp thuyết trình mượt hơn. Nút vẫn còn để chạy lại thủ công khi cần.
 
 ### 💡 Khoảnh khắc vàng của demo
 
 - Mới xem **1 món** → gợi ý "theo mốt" (tag P0)
 - Xem món **thứ 2** → gợi ý "bắt sóng" hành vi (tag P1)
 - → Càng xem, gợi ý càng thông minh = chữ **H** (Hierarchical) trong HSP
+- Panel **Bước 2** (model đã học): mở trước hội đồng **cách model học** — chuyển qua lại 2 nguồn: model mẫu 8 phiên và **model Yoochoose 375k phiên thật** (từ endpoint `/ml/paper/insights`) — mọi xác suất là phân số đếm thô, P1/P2/γ tra trực tiếp theo món đang xem
+- Panel **Bước 4** chốt ý này: một bảng duy nhất hiện cả 3 bước t=1,2,3 với tag màu P0/P1/P2 đổi dần
 - Kéo slider α → thứ tự gợi ý thay đổi **trước mắt hội đồng** = bộ nhớ quên của RIC
+- Panel **Bước 5a** hiện điểm w(t) **kèm nguyên phép tính** w = α·w(t−1) + (1−α)·c sau từng lượt xem (món không liên quan γ=0 tự yếu đi) · **5b** đặt 3 giá trị α cạnh nhau để chỉ tay so trực tiếp
 
 ### 🎤 Speaker notes
-> "Giờ em xin demo trực tiếp trên chính giao diện web của hệ thống. [Mở /admin/paper-demo] Đây là trang demo bài báo em tích hợp vào Admin — bên trái là chuỗi sản phẩm khách đang xem, em bấm chọn iPhone 15 trước. [Chạy] Khách mới xem 1 món, hệ thống gợi ý theo độ phổ biến — tag P0. Giờ em thêm Ốp lưng — ngay lập tức hệ thống nhận ra mẫu iPhone→ốp lưng trong lịch sử và đưa củ sạc lên đầu — tag P1. Thêm củ sạc — P2 khớp bộ ba tin cậy. Tag màu P2, P1, P0 cho thấy đúng cơ chế phân cấp của bài báo. [Đổi sang RIC, kéo α] Với RIC, em kéo hệ số quên α từ 0.9 xuống 0.1 — quý thầy cô thấy thứ tự gợi ý thay đổi ngay — bộ nhớ của mô hình bám theo hành vi gần nhất. [So sánh tất cả] Và đây là bảng so sánh 5 chiến lược trên cùng một phiên — mỗi hàng một sub-model của bài báo. Toàn bộ này chạy trên API thật của hệ thống, không phải mô phỏng. Kết quả offline trên 375 nghìn phiên thật ở slide sau."
+> "Giờ em xin demo trực tiếp trên chính giao diện web của hệ thống. [Mở /admin/paper-demo] Đây là trang demo bài báo em tích hợp vào Admin — bên trái là chuỗi sản phẩm khách đang xem, em bấm chọn iPhone 15 trước. [Chạy] Khách mới xem 1 món, hệ thống gợi ý theo độ phổ biến — tag P0. Giờ em thêm Ốp lưng — ngay lập tức hệ thống nhận ra mẫu iPhone→ốp lưng trong lịch sử và đưa củ sạc lên đầu — tag P1. Thêm củ sạc — P2 khớp bộ ba tin cậy. Tag màu P2, P1, P0 cho thấy đúng cơ chế phân cấp của bài báo. [Kéo xuống Bước 2 — Model đã học] Trước khi đi sâu, đây là toàn bộ kiến thức của model: P0, P1, P2 của HSP và sessions, γ của RIC — quý thầy cô thấy mọi xác suất đều là phân số đếm thô, chẳng hạn P2 của củ sạc sau bộ ba iPhone, ốp lưng là một chia hai bằng 0.5 — model KHÔNG học gì ngoài phép đếm, đúng tinh thần nhẹ của bài báo. [Kéo xuống Bước 4] Và đây là bảng tổng hợp đúng 3 bước vừa rồi: t=1 dùng P0, t=2 thêm P1, t=3 ưu tiên P2 — quy tắc hierarchy luôn lấp đủ Top-N, không trùng món đã xem. [Đổi sang RIC, kéo α] Với RIC, em kéo hệ số quên α từ 0.9 xuống 0.1 — quý thầy cô thấy thứ tự gợi ý thay đổi ngay — bộ nhớ của mô hình bám theo hành vi gần nhất. [Bước 5a] Bảng này còn hiện nguyên phép tính w bằng α nhân w cũ cộng một trừ α nhân c sau từng lượt xem: món không liên quan có γ bằng 0 tự yếu đi — đúng nghĩa bộ lọc hàm mũ. [Bước 6 — So sánh tất cả] Và đây là bảng so sánh 5 chiến lược trên cùng một phiên — mỗi hàng một sub-model của bài báo. Toàn bộ này chạy trên API thật của hệ thống, không phải mô phỏng. Kết quả offline trên 375 nghìn phiên thật ở panel Bước 7."
 
 ---
 
@@ -181,8 +190,9 @@ Lượt 2 — khách xem ốp lưng:
 
 ### 2 phát hiện đáng nói
 
-1. **RIC thắng baseline +19%** → bộ nhớ có hệ số quên hiệu quả hơn đếm tĩnh, nhỉnh cả Markov
-2. **α = 0.1 tốt nhất** (MRR@10 = 0.1993, +4.8% so với α=0.5) → khách đổi ý nhanh, "quên nhanh" là đúng
+1. **RIC thắng baseline +19% trên Yoochoose** (0.1902 vs co-occurrence 0.1595) → bộ nhớ có hệ số quên hiệu quả hơn đếm tĩnh, nhỉnh cả Markov
+2. **Xu hướng lặp lại trên Diginetica** — RIC 0.1142 > co-occurrence 0.0985 > sequence 0.0803 → kết luận "RIC tốt nhất" không phụ thuộc 1 dataset
+3. **α = 0.1 tốt nhất trên Yoochoose** (MRR@10 = 0.1993, +4.8% so với α=0.5) → khách đổi ý nhanh, "quên nhanh" là đúng
 
 ### 🎤 Speaker notes
 > "Để đánh giá khách quan, em chạy benchmark trên Yoochoose — đúng dataset và đúng protocol MRR, Recall của bài báo, với 375 nghìn phiên huấn luyện, chỉ 11 giây train. Kết quả: RIC đạt MRR@10 bằng 0.19 — cao hơn baseline co-occurrence khoảng 19 phần trăm và nhỉnh cả Markov chain. Khi quét hệ số quên, alpha 0.1 cho kết quả tốt nhất — khớp tính chất phiên mua sắm: hành vi đổi rất nhanh nên bộ nhớ quên nhanh bám kịp; bài báo cũng kết luận alpha tối ưu tùy dataset. Riêng HSP thấp hơn — em nói trung thực: P2 yêu cầu bộ ba liền kề chính xác, trong khi bản dữ liệu em dùng khá thưa nên số lần khớp ít; cơ chế fallback vẫn hoạt động đúng, chỉ là chất lượng dự đoán phụ thuộc độ dày dữ liệu. Bài báo gốc train trên ~9 triệu phiên với pipeline xử lý riêng nên số tuyệt đối khác — mục tiêu của em là tái lập đúng xu hướng so sánh."
@@ -195,11 +205,11 @@ Lượt 2 — khách xem ốp lưng:
 
 | Câu hỏi | Câu trả lời |
 |---------|-------------|
-| Data ở đâu? | 375,000 phiên thật Yoochoose + bảng ProductView của hệ thống |
-| Làm gì với data? | Đếm mẫu hành vi P0/P1/P2 + cùng phiên → 11 giây, không GPU |
-| Demo thế nào? | Demo trực tiếp trên web Admin (`/admin/paper-demo`): khách xem thêm món → gợi ý thông minh hơn dần theo cấp |
-| Thuật toán? | HSP đoán theo thứ tự · RIC ghi điểm cùng phiên + quên α → **RIC tốt nhất** |
+| Data ở đâu? | 2 dataset bài báo trong repo: Yoochoose 375k phiên + Diginetica 176k phiên, cộng bảng ProductView của hệ thống |
+| Làm gì với data? | Đếm mẫu hành vi P0/P1/P2 + cùng phiên → 11 giây, không GPU | |
 
+| Demo thế nào? | Demo trực tiếp trên web Admin (`/admin/paper-demo`): khách xem thêm món → gợi ý thông minh hơn dần theo cấp; panel riêng hiện model đã học (P0/P1/P2, γ) bằng phân số đếm thô |
+| Thuật toán? | HSP đoán theo thứ tự · RIC ghi điểm cùng phiên + quên α → **RIC tốt nhất**
 ### Đóng góp của em so với bài báo
 
 - Bài báo **không public code** → em cài lại từ mô tả toán học
@@ -207,20 +217,20 @@ Lượt 2 — khách xem ốp lưng:
 - **Benchmark tái lập** đúng protocol để kiểm chứng + smoke test tự động
 
 ### 🎤 Speaker notes
-> "Tóm lại, quay về đúng 4 câu hỏi mở đầu: data là 375 nghìn phiên thật cộng với bảng lượt xem của hệ thống; việc làm với data là đếm mẫu hành vi — 11 giây, không GPU; demo cho thấy gợi ý thông minh hơn dần khi khách xem thêm; và hai thuật toán — HSP theo thứ tự, RIC cùng phiên với bộ nhớ quên — trong đó RIC tốt nhất. Đóng góp của em: bài báo không kèm source code nên em cài đặt lại từ công thức, tích hợp thành endpoint thật, và kiểm chứng bằng benchmark đúng protocol. Trong hệ thống tổng thể, đây là mô hình thứ nhất trong 7 nhóm ML, đóng vai trò fallback cho cold-start, và đo hiệu quả qua A/B testing. Em xin sẵn sàng trả lời câu hỏi về phần này."
+> "Tóm lại, quay về đúng 4 câu hỏi mở đầu: data là 375 nghìn phiên thật cộng với bảng lượt xem của hệ thống; việc làm với data là đếm mẫu hành vi — 11 giây, không GPU; demo cho thấy gợi ý thông minh hơn dần khi khách xem thêm; và hai thuật toán — HSP theo thứ tự, RIC cùng phiên với bộ nhớ quên — trong đó RIC tốt nhất. Đóng góp của em: bài báo không kèm source code nên em cài đặt lại từ công thức, tích hợp thành endpoint thật, và kiểm chứng bằng benchmark đúng protocol. Trong hệ thống tổng thể, đây là mô hình thứ nhất trong các nhóm ML, đóng vai trò fallback cho cold-start. Em xin sẵn sàng trả lời câu hỏi về phần này."
 
 ---
 
 ## 🛡️ HỎI ĐÁP DỰ KIẾN (PHẦN 1)
 
 **Q1: HSP và RIC khác nhau thế nào, khi nào dùng cái nào?**
-→ HSP khai thác quan hệ **thứ tự** (Next) — mạnh khi mẫu hành vi tuần tự rõ. RIC khai thác **cùng phiên** (không thứ tự) + bộ nhớ quên — ổn định với phiên dài. Cài cả hai, chọn qua tham số `strategy`, có thể A/B test.
+→ HSP khai thác quan hệ **thứ tự** (Next) — mạnh khi mẫu hành vi tuần tự rõ. RIC khai thác **cùng phiên** (không thứ tự) + bộ nhớ quên — ổn định với phiên dài. Cài cả hai, chọn qua tham số `strategy`.
 
 **Q2: Vì sao HSP thấp hơn RIC trong kết quả của em?**
 → P2 chỉ khớp khi bộ ba **liền kề chính xác**; bản Yoochoose em dùng khá thưa (144,915 bộ ba / 375k phiên) nên số lần khớp ít. Bài báo gốc dùng graph modeling đầy đủ + tiền xử lý riêng nên P2 phong phú hơn. Fallback P2→P1→P0 vẫn hoạt động đúng — HSP vẫn trả đủ Top-N.
 
 **Q3: Vì sao số tuyệt đối thấp hơn bài báo gốc?**
-→ (1) Bài báo train ~9 triệu phiên, em dùng bản 375k + 5000 test; (2) tiền xử lý khác nhau; (3) mục tiêu là tái lập đúng **xu hướng so sánh**, không đua SOTA.
+→ (1) Bài báo train ~9 triệu phiên, em dùng bản Yoochoose 375k + 5000 test; (2) tiền xử lý khác nhau; (3) mục tiêu là tái lập đúng **xu hướng so sánh**, không đua SOTA. Điểm củng cố: xu hướng RIC > co-occurrence > sequence **lặp lại nhất quán trên cả 2 dataset** (Yoochoose + Diginetica đã tích hợp trong repo, chuyển tab benchmark trực tiếp trên web).
 
 **Q4: Cold-start xử lý thế nào?**
 → Chính là cấp **P0**: item/user chưa có lịch sử thì gợi ý theo độ phổ biến toàn cục. Đây là lý do HSP/RIC luôn trả đủ Top-N.
@@ -244,13 +254,16 @@ Lượt 2 — khách xem ốp lưng:
 **Q9: Lấy gì làm dữ liệu session trong hệ thống thật?**
 → Bảng `ProductView` (user_id, product_id, timestamp). `build_sessions_from_views()` chia phiên bằng timeout 30 phút — cấu hình được trong `SessionConfig`.
 
+**Q10: Chọn sản phẩm shop ở chế độ "Model bài báo" thì sao mọi gợi ý đều P0?**
+→ Đúng thiết kế: model Yoochoose chỉ biết 16,245 item ẩn danh của dataset — sản phẩm shop không nằm trong model. Trang demo hiện rõ điều này qua badge "KHÔNG có trong model → cold-start" và bảng tra P1/P2/γ trống ở panel Bước 2/Bước 4 — chính là cơ chế fallback P0 của HSP/RIC khi gặp item lạ. Muốn thấy model Yoochoose "sống" thật thì chọn sản phẩm mẫu (iPhone 15, Ốp lưng…) — model tra được P1/P2/γ thật với phân số đếm từ 375k phiên.
+
 ---
 
 ## 📋 CHECKLIST TRƯỚC KHI LÊN BỘ
 
-- ✔ Trang demo web `/admin/paper-demo` đã build và test (Bước 1–6 như slide DEMO)
+- ✔ Trang demo web `/admin/paper-demo` đã build và test (Bước 1–7: phiên → model đã học → strategy → HSP từng bước → RIC/α → so sánh 5 chiến lược → benchmark Yoochoose)
 - ✔ Demo dự phòng CLI `python -m session.demo_paper` đã test pass (không cần server, không cần numpy)
-- ✔ Benchmark Yoochoose xong — số liệu đã vào slide KẾT QUẢ
+- ✔ Benchmark Yoochoose xong — số liệu đã vào slide KẾT QUẢ · Diginetica đã tích hợp + benchmark live qua tab dataset trên web (RIC vẫn tốt nhất)
 - ☐ Trước buổi bảo vệ: khởi động ML service (`python -m clustering.api`) + backend + frontend, đăng nhập Admin
 - ☐ Mở sẵn tab trình duyệt `/admin/paper-demo` + tab dự phòng `http://localhost:8000/docs`
 - ☐ In/hiện DOI bài báo: 10.3390/app13010394

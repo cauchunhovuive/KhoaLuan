@@ -23,10 +23,8 @@ const ADMIN_MENU = [
   { key: 'Partners', icon: '🏪', label: 'Đối tác' },
   { key: 'Refunds', icon: '🔄', label: 'Hoàn tiền' },
   { key: 'Violations', icon: '⚠️', label: 'Vi phạm' },
-  { key: 'Recommendations', icon: '📊', label: 'Gợi ý SP' },
   { key: 'Clusters', icon: '🧠', label: 'Phân cụm' },
   { key: 'MLTest', icon: '🧪', label: 'Kiểm tra ML' },
-  { key: 'ABTesting', icon: '🔬', label: 'A/B Test' },
   { key: 'AuditLog', icon: '📜', label: 'Audit Log' },
   { key: 'Settings', icon: '⚙️', label: 'Cài đặt' },
 ];

@@ -9,6 +9,7 @@ import {
 import { fetchProductBySlug, clearCurrentProduct } from '../store/productSlice';
 import { addToCart } from '../store/cartSlice';
 import api from '../services/api';
+import { trackProductView, fetchSessionRecommendations, getGuestId } from '../services/sessionRecommender';
 import LazySection from '../components/common/LazySection';
 import LazyImage from '../components/common/LazyImage';
 import toast from 'react-hot-toast';
@@ -78,6 +79,37 @@ const ProductDetailPage = () => {
   const dispatch = useDispatch();
   const { currentProduct: product, loading } = useSelector((state) => state.products);
   const { isAuthenticated } = useSelector((state) => state.auth);
+
+  // ═══ HSP/RIC — gợi ý theo phiên (Delianidi et al. 2023) ═══
+  // Chạy sau khi track lượt xem: mức gợi ý P2→P1→P0 tự nâng dần khi khách xem thêm.
+  useEffect(() => {
+    if (!product) return;
+    let cancelled = false;
+    (async () => {
+      // Track TRƯỚC khi gọi gợi ý — nếu không, lượt xem đầu tiên gửi session rỗng
+      // và cold-start P0/P1 không bao giờ được dùng từ UI.
+      trackProductView(product.id);
+      setSessionRecsLoading(true);
+      try {
+        let { recommendations } = await fetchSessionRecommendations({ topN: 8 });
+        if (cancelled) return;
+        // Fallback: model chưa đủ dữ liệu train → dùng API similar (đã cache) của backend
+        if (!recommendations.length) {
+          const res = await api.get(`/recommendations/similar/${product.id}`).catch(() => null);
+          recommendations = res?.data?.data || [];
+        }
+        setSessionRecs(recommendations);
+        setSessionLevels(Object.fromEntries(
+          recommendations.map((r) => [r.id || r.product_id, r.hsp_level || null])
+        ));
+      } catch {
+        // ML service chưa train đủ dữ liệu — im lặng, không phá trang
+      } finally {
+        if (!cancelled) setSessionRecsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [product?.id]);
   const [quantity, setQuantity] = useState(1);
   const [currentImage, setCurrentImage] = useState(0);
 
@@ -91,6 +123,11 @@ const ProductDetailPage = () => {
   // Related products (similar)
   const [sessionRecs, setSessionRecs] = useState([]);
   const [sessionRecsLoading, setSessionRecsLoading] = useState(false);
+  const [sessionLevels, setSessionLevels] = useState({});
+  // Ref chống double-log view: StrictMode (dev) chạy effect 2 lần + lần click
+  // thứ 2 trong vòng 30s trên cùng sản phẩm bị coi là lặp (nhát đôi do re-render,
+  // back-forward cache...), không phải lượt xem thật mới.
+  const lastLoggedViewRef = useRef({ productId: null, at: 0 });
 
   useEffect(() => {
     dispatch(clearCurrentProduct());
@@ -112,15 +149,16 @@ const ProductDetailPage = () => {
     if (!product) return;
     const pid = product.id;
 
-    // Log view
-    api.post(`/products/${pid}/view`).catch(() => {});
-
-    // Load related products — dùng API backend đã cache, nhanh hơn ML trực tiếp
-    setSessionRecsLoading(true);
-    api.get(`/recommendations/similar/${pid}`)
-      .then(({ data }) => setSessionRecs(data.data || []))
-      .catch(() => {})
-      .finally(() => setSessionRecsLoading(false));
+    // Log view (backend ProductView — dữ liệu train HSP/RIC).
+    // guestId riêng từng trình duyệt → server tách phiên khách vãng lai đúng
+    // (nếu dùng chung 'anonymous' thì hành vi mọi khách bị trộn thành 1 người).
+    // Ref-guard: chặn double-fire (StrictMode mount 2 lần) và lặp < 30s
+    // trên cùng sản phẩm — nếu không P1/P2 bị lọc trùng cặp (X,X) sai.
+    const last = lastLoggedViewRef.current;
+    const now = Date.now();
+    if (last.productId === pid && now - last.at < 30_000) return;
+    lastLoggedViewRef.current = { productId: pid, at: now };
+    api.post(`/products/${pid}/view`, { guestId: getGuestId() }).catch(() => {});
   }, [product]);
 
   useEffect(() => {
@@ -436,12 +474,17 @@ const ProductDetailPage = () => {
           </div>
         </div>
 
-        {/* ═══════════════ ML SESSION RECOMMENDATIONS ═══════════════ */}
+        {/* ═══════════════ HSP/RIC — GỢI Ý THEO PHIÊN (Delianidi et al. 2023) ═══════════════ */}
         {(sessionRecs.length > 0 || sessionRecsLoading) && (
           <LazySection placeholder={<div className="mt-16" />}>
           <Reveal className="mt-16 md:mt-20" delay={100}>
             <section>
-              <SectionBadge icon={FiZap} label="Sản phẩm liên quan" sublabel="Gợi ý từ AI dựa trên sản phẩm bạn đang xem" color="purple" />
+              <SectionBadge
+                icon={FiZap}
+                label="Có thể bạn cũng thích"
+                sublabel="Gợi ý theo phiên xem của bạn — HSP + RIC (Delianidi et al. 2023)"
+                color="purple"
+              />
               {sessionRecsLoading ? (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                   {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -478,10 +521,12 @@ const ProductDetailPage = () => {
                               <FiShoppingBag className="text-2xl" />
                             </div>
                           )}
-                          {/* ML indicator */}
-                          <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-white/80 backdrop-blur-md rounded-md text-[8px] font-semibold text-purple-600 shadow-sm">
-                            <FiZap className="inline mr-0.5 text-[7px]" /> AI
-                          </div>
+                          {/* HSP level badge: mức xác suất đã khớp (P2 > P1 > P0) */}
+                          {sessionLevels[item.id] && (
+                            <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-white/80 backdrop-blur-md rounded-md text-[8px] font-bold text-purple-600 shadow-sm">
+                              {sessionLevels[item.id]}
+                            </div>
+                          )}
                         </div>
                         <div className="p-3">
                           <p className="text-xs font-medium text-ink truncate group-hover:text-primary-600 transition-colors">{item.name}</p>

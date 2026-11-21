@@ -440,7 +440,7 @@ const HomePage = () => {
             <div className="flex items-center justify-center mt-8 space-x-4 text-xs text-ink-tertiary">
               <div className="flex items-center space-x-1.5">
                 <span className="w-1 h-1 rounded-full bg-primary-400" />
-                <span>Collaborative Filtering</span>
+                <span>Phân cụm KMeans</span>
               </div>
               <div className="flex items-center space-x-1.5">
                 <span className="w-1 h-1 rounded-full bg-violet-400" />

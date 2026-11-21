@@ -30,32 +30,29 @@
 
 ---
 
-## 2. Gợi ý theo lịch sử mua hàng (Collaborative Filtering)
+## 2. Gợi ý theo phân khúc khách hàng (Clustering-based)
 
 | Mục | Nội dung |
 |---|---|
-| **Tên usecase** | Gợi ý sản phẩm theo Collaborative Filtering |
-| **Mô tả sơ lược** | Hệ thống gợi ý sản phẩm dựa trên lịch sử mua hàng của toàn bộ người dùng, sử dụng 4 mô hình: Item-Item CF, User-User CF, ALS Matrix Factorization và Hybrid ensemble. |
+| **Tên usecase** | Gợi ý sản phẩm theo phân khúc khách hàng |
+| **Mô tả sơ lược** | Hệ thống phân cụm khách hàng theo RFM + K-Means trên toàn bộ lịch sử đơn hàng, rồi gợi ý những sản phẩm được mua nhiều nhất trong cùng cụm khách hàng. |
 | **Actor chính** | Khách hàng |
 | **Actor phụ** | Admin (huấn luyện/giám sát model) |
-| **Tiền điều kiện** | Khách hàng đã đăng nhập và có lịch sử đơn hàng (hoặc hệ thống đã có dữ liệu đơn hàng toàn hệ thống). |
-| **Hậu điều kiện** | Danh sách sản phẩm được gợi ý cá nhân hóa hiển thị cho khách hàng. |
+| **Tiền điều kiện** | Hệ thống đã chạy phân cụm (RFM + K-Means) trên dữ liệu đơn hàng. |
+| **Hậu điều kiện** | Danh sách sản phẩm được gợi ý hiển thị cho khách hàng. |
 
 **Luồng sự kiện chính (main flow)**
 
 | Actor | System |
 |---|---|
-| 1. Truy cập trang chủ/trang sản phẩm sau khi đăng nhập. | 2. Lấy ma trận user-product từ lịch sử đơn hàng. |
-| | 3. Tính Item-Item CF (cosine similarity giữa sản phẩm). |
-| | 4. Tính User-User CF (độ tương đồng giữa người dùng). |
-| | 5. Tính ALS Matrix Factorization (R ≈ U × Vᵀ với implicit feedback). |
-| | 6. Kết hợp 3 kết quả theo trọng số Hybrid (item=0.3, user=0.3, als=0.4). |
-| | 7. Trả về danh sách gợi ý cá nhân hóa. |
-| 8. Xem sản phẩm được gợi ý. | |
+| 1. Truy cập trang chủ/trang sản phẩm sau khi đăng nhập. | 2. Lấy clusterId của khách hàng. |
+| | 3. Lấy danh sách khách hàng trong cùng cụm. |
+| | 4. Tổng hợp các sản phẩm được mua nhiều nhất trong cụm (loại trừ sản phẩm đã mua). |
+| | 5. Sắp xếp theo điểm số (tổng số lượng bán) và trả về top-N. |
+| 6. Xem sản phẩm được gợi ý. | |
 
 **Luồng phụ (alternative flow)**
-- A1: Một model trong Hybrid bị lỗi → hệ thống bỏ qua model đó và fallback sang các model còn lại.
-- A2: Không đủ dữ liệu đơn hàng → chuyển sang gợi ý phổ biến (Popular products).
+- A1: Khách hàng chưa có cluster (cold start) → chuyển sang gợi ý phổ biến (Popular products).
 
 ---
 
@@ -86,59 +83,7 @@
 
 ---
 
-## 4. Đánh giá chất lượng gợi ý (Offline Evaluation Pipeline)
-
-| Mục | Nội dung |
-|---|---|
-| **Tên usecase** | Đánh giá offline chất lượng recommendation |
-| **Mô tả sơ lược** | Hệ thống đo lường hiệu quả các mô hình gợi ý bằng tập dữ liệu giữ lại (hold-out set), tính các chỉ số Precision, Recall, F1, NDCG, Coverage... |
-| **Actor chính** | Admin |
-| **Actor phụ** | Không |
-| **Tiền điều kiện** | Các model gợi ý (CF, Session-based) đã được huấn luyện. |
-| **Hậu điều kiện** | Báo cáo chỉ số đánh giá được lưu và hiển thị cho Admin. |
-
-**Luồng sự kiện chính (main flow)**
-
-| Actor | System |
-|---|---|
-| 1. Chọn chức năng "Đánh giá model" và bấm chạy. | 2. Tách 20% đơn hàng làm tập test (hold-out). |
-| | 3. Chạy dự đoán gợi ý trên tập test bằng model hiện tại. |
-| | 4. Tính Precision@K, Recall@K, F1, Hit Rate. |
-| | 5. Tính MAP@K, NDCG@K (đánh giá thứ hạng). |
-| | 6. Tính Coverage và Popularity Bias (Gini coefficient). |
-| | 7. Tổng hợp và hiển thị báo cáo kết quả. |
-| 8. Xem báo cáo, so sánh giữa các phiên bản model. | |
-
----
-
-## 5. So sánh hiệu quả thuật toán (A/B Testing Framework)
-
-| Mục | Nội dung |
-|---|---|
-| **Tên usecase** | So sánh Control vs Treatment (A/B Testing) |
-| **Mô tả sơ lược** | Hệ thống chia người dùng thành 2 nhóm (Control dùng thuật toán hiện tại, Treatment dùng thuật toán mới), ghi log hành vi và so sánh tỉ lệ chuyển đổi bằng kiểm định Chi-squared. |
-| **Actor chính** | Admin |
-| **Actor phụ** | Khách hàng (nguồn dữ liệu hành vi) |
-| **Tiền điều kiện** | Đã cấu hình 2 nhóm thử nghiệm (Control/Treatment) và các thuật toán tương ứng. |
-| **Hậu điều kiện** | Báo cáo kết luận thuật toán nào tốt hơn được lưu lại. |
-
-**Luồng sự kiện chính (main flow)**
-
-| Actor | System |
-|---|---|
-| 1. Khởi tạo thử nghiệm A/B trên trang quản trị. | 2. Phân chia người dùng ngẫu nhiên vào nhóm Control/Treatment. |
-| 3. Khách hàng tương tác (xem, click, mua) trong quá trình dùng web. | 4. Ghi log tương tác của từng nhóm (`/abtest/log`). |
-| 5. Admin bấm "So sánh kết quả". | 6. Tính tỉ lệ chuyển đổi từng nhóm (`/abtest/compare`). |
-| | 7. Thực hiện kiểm định Chi-squared để xác định ý nghĩa thống kê. |
-| | 8. Xuất báo cáo kết luận (`/abtest/report`). |
-| 9. Xem báo cáo và quyết định áp dụng thuật toán mới hay giữ nguyên. | |
-
-**Luồng phụ (alternative flow)**
-- A1: Kết quả không có ý nghĩa thống kê (p-value cao) → hệ thống khuyến nghị giữ nguyên Control.
-
----
-
-## 6. Trò chuyện với AI hỗ trợ (RAG Chat AI)
+## 4. Trò chuyện với AI hỗ trợ (RAG Chat AI)
 
 | Mục | Nội dung |
 |---|---|
@@ -164,12 +109,12 @@
 
 ---
 
-## 7. Gợi ý cá nhân hóa tích hợp (Personalized Recommendations)
+## 5. Gợi ý cá nhân hóa tích hợp (Personalized Recommendations)
 
 | Mục | Nội dung |
 |---|---|
 | **Tên usecase** | Xem gợi ý cá nhân hóa |
-| **Mô tả sơ lược** | Sau khi đăng nhập, hệ thống kết hợp nhiều tầng AI (CF Hybrid → phân khúc khách hàng → sản phẩm phổ biến) để đưa ra gợi ý phù hợp nhất, có cache Redis để tăng tốc. |
+| **Mô tả sơ lược** | Sau khi đăng nhập, hệ thống kết hợp nhiều tầng AI (phân khúc khách hàng → sản phẩm phổ biến) để đưa ra gợi ý phù hợp nhất, có cache Redis để tăng tốc. |
 | **Actor chính** | Khách hàng |
 | **Actor phụ** | Không |
 | **Tiền điều kiện** | Khách hàng đã đăng nhập. |
@@ -180,11 +125,10 @@
 | Actor | System |
 |---|---|
 | 1. Đăng nhập và truy cập trang chủ. | 2. Kiểm tra cache Redis (personalized 10 phút) — nếu có thì trả kết quả ngay. |
-| | 3. Nếu chưa có cache: gọi ML Service (CF Hybrid), train nếu cần rồi lấy giải thích gợi ý (`/cf/explain`). |
-| | 4. Nếu ML Service lỗi/không đủ dữ liệu: tìm khách hàng cùng cluster (RFM) và lấy sản phẩm phổ biến trong cluster đó. |
-| | 5. Nếu vẫn không có kết quả: fallback lấy sản phẩm phổ biến toàn hệ thống (sắp theo `soldCount`, `rating`). |
-| | 6. Lưu kết quả vào cache Redis và trả về danh sách gợi ý. |
-| 7. Xem sản phẩm được gợi ý. | |
+| | 3. Nếu chưa có cache: tìm khách hàng cùng cluster (RFM) và lấy sản phẩm được mua nhiều nhất trong cluster đó. |
+| | 4. Nếu khách hàng chưa có cluster hoặc dữ liệu không đủ: fallback lấy sản phẩm phổ biến toàn hệ thống (sắp theo `soldCount`, `rating`). |
+| | 5. Lưu kết quả vào cache Redis và trả về danh sách gợi ý. |
+| 6. Xem sản phẩm được gợi ý. | |
 
 **Luồng phụ (alternative flow)**
-- A1: Cả 3 tầng đều lỗi → hiển thị danh sách sản phẩm mặc định (best-seller chung).
+- A1: Cả 2 tầng đều lỗi → hiển thị danh sách sản phẩm mặc định (best-seller chung).

@@ -1,42 +1,16 @@
 import React, { useState, useRef } from 'react';
-import { FiPlay, FiCheckCircle, FiXCircle, FiClock, FiCpu, FiActivity, FiBarChart2, FiZap, FiRefreshCw, FiServer, FiTrendingUp, FiShoppingBag, FiUsers, FiSend, FiLayers } from 'react-icons/fi';
+import { FiPlay, FiCheckCircle, FiXCircle, FiClock, FiCpu, FiActivity, FiBarChart2, FiRefreshCw, FiTrendingUp, FiLayers } from 'react-icons/fi';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
 const TESTS = [
   { key: 'health', label: 'ML Health', icon: FiCpu, endpoint: 'GET /api/ml/health' },
   { key: 'trainSession', label: 'Train Session', icon: FiClock, endpoint: 'POST /api/ml/session/train' },
-  { key: 'trainCF', label: 'Train CF Model', icon: FiZap, endpoint: 'POST /api/ml/cf/train' },
-  { key: 'graphcfTrain', label: 'Train Graph CF', icon: FiLayers, endpoint: 'POST /api/ml/graphcf/train' },
-  { key: 'lightgcnTrain', label: 'Train LightGCN-CF', icon: FiCpu, endpoint: 'POST /api/ml/lightgcncf/train' },
-  { key: 'evaluate', label: 'Evaluate Models', icon: FiBarChart2, endpoint: 'POST /api/ml/evaluate' },
   { key: 'cluster', label: 'Run Clustering', icon: FiLayers, endpoint: 'POST /api/clusters/run' },
   { key: 'trending', label: 'Trending Products', icon: FiTrendingUp, endpoint: 'GET /api/recommendations/trending' },
   { key: 'sessionRec', label: 'Session Recommend', icon: FiActivity, endpoint: 'POST /api/ml/session/recommend' },
   { key: 'sessionRic', label: 'Session Recommend (RIC)', icon: FiBarChart2, endpoint: 'POST /api/ml/session/recommend (strategy=ric)' },
-  { key: 'graphcfRec', label: 'Graph CF Recommend', icon: FiActivity, endpoint: 'POST /api/ml/graphcf/recommend' },
-  { key: 'lightgcnRec', label: 'LightGCN-CF Recommend', icon: FiCpu, endpoint: 'POST /api/ml/lightgcncf/recommend' },
-  { key: 'explain', label: 'Explain Recs', icon: FiSend, endpoint: 'POST /api/ml/explain' },
-  { key: 'abtestLog', label: 'A/B Test Log', icon: FiShoppingBag, endpoint: 'POST /api/ml/abtest/log' },
-  { key: 'abtestCompare', label: 'A/B Test Compare', icon: FiBarChart2, endpoint: 'POST /api/ml/abtest/compare' },
-  { key: 'abtestReport', label: 'A/B Test Report', icon: FiServer, endpoint: 'GET /api/ml/abtest/report' },
 ];
-
-const getSampleCustomer = async () => {
-  // Ưu tiên khách hàng CÓ đơn hàng (kết quả gợi ý luôn có ý nghĩa)
-  try {
-    const { data } = await api.get('/users/with-orders');
-    const customers = data?.data || [];
-    if (customers.length > 0) return customers[0].id;
-  } catch (e) { /* fallback bên dưới */ }
-  try {
-    const { data: custData } = await api.get('/users?role=CUSTOMER&limit=1');
-    const customers = custData?.data?.users || custData?.users || [];
-    return customers[0]?.id || null;
-  } catch (e) {
-    return null;
-  }
-};
 
 const MLTestPage = () => {
   const [results, setResults] = useState({});
@@ -62,37 +36,6 @@ const MLTestPage = () => {
           res = { success: data.success && data.data?.trained, details: `${data.data?.n_views || 0} views`, ms: Math.round(performance.now() - start) };
           break;
         }
-        case 'trainCF': {
-          const { data } = await api.post('/ml/cf/train');
-          res = { success: data.success && data.data?.trained, details: `${data.data?.n_orders || 0} orders, ${data.data?.models?.length || 0} models`, ms: Math.round(performance.now() - start) };
-          break;
-        }
-        case 'graphcfTrain': {
-          const { data } = await api.post('/ml/graphcf/train');
-          res = { success: data.success && data.data?.trained, details: `${data.data?.n_orders || 0} orders, ${data.data?.n_products || 0} products`, ms: Math.round(performance.now() - start) };
-          break;
-        }
-        case 'lightgcnTrain': {
-          const { data } = await api.post('/ml/lightgcncf/train');
-          res = { success: data.success && data.data?.trained, details: `${data.data?.n_orders || 0} orders, ${data.data?.n_products || 0} products`, ms: Math.round(performance.now() - start) };
-          break;
-        }
-        case 'graphcfRec': {
-          const customerId = await getSampleCustomer();
-          if (!customerId) { res = { success: false, details: 'No sample customer', ms: 0 }; break; }
-          const { data } = await api.post('/ml/graphcf/recommend', { userId: customerId, topN: 5 });
-          const recs = data?.data?.recommendations || [];
-          res = { success: recs.length > 0, details: `${recs.length} gợi ý`, top: recs.slice(0, 3).map(p => p.name).join(', '), ms: Math.round(performance.now() - start) };
-          break;
-        }
-        case 'lightgcnRec': {
-          const customerId = await getSampleCustomer();
-          if (!customerId) { res = { success: false, details: 'No sample customer', ms: 0 }; break; }
-          const { data } = await api.post('/ml/lightgcncf/recommend', { userId: customerId, topN: 5 });
-          const recs = data?.data?.recommendations || [];
-          res = { success: recs.length > 0, details: `${recs.length} gợi ý`, top: recs.slice(0, 3).map(p => p.name).join(', '), ms: Math.round(performance.now() - start) };
-          break;
-        }
         case 'sessionRic': {
           const { data: prodData } = await api.get('/products?limit=5');
           const products = prodData?.data?.products || prodData?.products || [];
@@ -100,12 +43,6 @@ const MLTestPage = () => {
           const { data } = await api.post('/ml/session/recommend', { sessionItems: [products[0].id, products[1].id], topN: 5, strategy: 'ric' });
           const recs = data?.data || [];
           res = { success: recs.length > 0, details: `${recs.length} gợi ý (RIC)`, top: recs.slice(0, 3).map(p => p.name).join(', '), ms: Math.round(performance.now() - start) };
-          break;
-        }
-        case 'evaluate': {
-          const { data } = await api.post('/ml/evaluate', { topN: 10 });
-          const m = data.data?.metrics;
-          res = { success: !!m, details: m ? `Precision: ${(m.precision * 100).toFixed(1)}%, Recall: ${(m.recall * 100).toFixed(1)}%` : data.data?.message, ms: Math.round(performance.now() - start) };
           break;
         }
         case 'cluster': {
@@ -127,38 +64,6 @@ const MLTestPage = () => {
           const { data } = await api.post('/ml/session/recommend', { sessionItems: [products[0].id, products[1].id], topN: 5 });
           const recs = data?.data || [];
           res = { success: true, details: `${recs.length} gợi ý`, top: recs.slice(0, 3).map(p => p.name).join(', '), ms: Math.round(performance.now() - start) };
-          break;
-        }
-        case 'explain': {
-          const { data: me } = await api.get('/auth/me');
-          const userId = me?.data?.id || me?.id;
-          if (!userId) { res = { success: false, details: 'Cannot get user ID', ms: 0 }; break; }
-          const { data } = await api.post('/ml/explain', { userId, topN: 5 });
-          const recs = data?.data?.recommendations || [];
-          const weights = data?.data?.weights || {};
-          res = { success: true, details: `${recs.length} recs | weights: ${Object.keys(weights).join(', ')}`, ms: Math.round(performance.now() - start) };
-          break;
-        }
-        case 'abtestLog': {
-          const { data: custData } = await api.get('/users?role=CUSTOMER&limit=1');
-          const customers = custData?.data?.users || custData?.users || [];
-          const { data: prodData2 } = await api.get('/products?limit=1');
-          const prods = prodData2?.data?.products || prodData2?.products || [];
-          if (!customers.length || !prods.length) { res = { success: false, details: 'No sample data', ms: 0 }; break; }
-          const { data } = await api.post('/ml/abtest/log', { group: 'control', userId: customers[0].id, productId: prods[0].id, action: 'impression' });
-          res = { success: data.success, details: `${data.data?.action || 'impression'} — ${customers[0].name}`, ms: Math.round(performance.now() - start) };
-          break;
-        }
-        case 'abtestCompare': {
-          const { data } = await api.post('/ml/abtest/compare', { groupA: 'control', groupB: 'treatment' });
-          res = { success: data.success, details: `Winner: ${data.data?.winner || 'tie'}`, ms: Math.round(performance.now() - start) };
-          break;
-        }
-        case 'abtestReport': {
-          const { data } = await api.get('/ml/abtest/report');
-          const control = data.data?.control?.total_events || 0;
-          const treatment = data.data?.treatment?.total_events || 0;
-          res = { success: data.success, details: `Control: ${control} events | Treatment: ${treatment} events`, ms: Math.round(performance.now() - start) };
           break;
         }
         default:
@@ -316,7 +221,7 @@ const MLTestPage = () => {
               </div>
               <p className="text-xs opacity-80 mt-1">
                 {failed === 0
-                  ? `✅ ${passed}/${total} test passed. ML Engine ổn định: Session-based (HSP/RIC), CF, Graph-based (LightGCN-CF/Graph CF), Clustering, A/B Testing.`
+                  ? `✅ ${passed}/${total} test passed. ML Engine ổn định: Session-based (HSP/RIC), Clustering (KMeans).`
                   : `⚠️ ${failed} test cần kiểm tra lại. Xem chi tiết từng test để biết nguyên nhân.`}
               </p>
             </div>

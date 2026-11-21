@@ -9,15 +9,9 @@ import Toast from 'react-native-toast-message';
 const TESTS = [
   { key: 'health', label: 'ML Health', endpoint: 'GET /api/ml/health' },
   { key: 'trainSession', label: 'Train Session', endpoint: 'POST /api/ml/session/train' },
-  { key: 'trainCF', label: 'Train CF', endpoint: 'POST /api/ml/cf/train' },
-  { key: 'evaluate', label: 'Evaluate Models', endpoint: 'POST /api/ml/evaluate' },
   { key: 'cluster', label: 'Run Clustering', endpoint: 'POST /api/clusters/run' },
   { key: 'trending', label: 'Trending Products', endpoint: 'GET /api/recommendations/trending' },
   { key: 'sessionRec', label: 'Session Recommend', endpoint: 'POST /api/ml/session/recommend' },
-  { key: 'explain', label: 'Explain Recs', endpoint: 'POST /api/ml/explain' },
-  { key: 'abtestLog', label: 'A/B Test Log', endpoint: 'POST /api/ml/abtest/log' },
-  { key: 'abtestCompare', label: 'A/B Test Compare', endpoint: 'POST /api/ml/abtest/compare' },
-  { key: 'abtestReport', label: 'A/B Test Report', endpoint: 'GET /api/ml/abtest/report' },
 ];
 
 const AdminMLTestScreen = () => {
@@ -42,17 +36,6 @@ const AdminMLTestScreen = () => {
           res = { status: 'pass', details: `${data.data?.n_views || 0} views`, ms: Math.round(Date.now() - start) };
           break;
         }
-        case 'trainCF': {
-          const { data } = await api.post('/ml/cf/train');
-          res = { status: 'pass', details: `${data.data?.n_orders || 0} orders`, ms: Math.round(Date.now() - start) };
-          break;
-        }
-        case 'evaluate': {
-          const { data } = await api.post('/ml/evaluate', { topN: 10 });
-          const m = data.data?.metrics;
-          res = { status: 'pass', details: m ? `P:${(m.precision * 100).toFixed(1)}% R:${(m.recall * 100).toFixed(1)}%` : 'No metrics', ms: Math.round(Date.now() - start) };
-          break;
-        }
         case 'cluster': {
           const { data } = await api.post('/clusters/run');
           res = { status: 'pass', details: `${(data.data?.clusters || []).length} clusters`, ms: Math.round(Date.now() - start) };
@@ -69,34 +52,6 @@ const AdminMLTestScreen = () => {
           if (products.length < 2) { res = { status: 'fail', details: 'Not enough products', ms: 0 }; break; }
           const { data } = await api.post('/ml/session/recommend', { sessionItems: [products[0].id, products[1].id], topN: 5 });
           res = { status: 'pass', details: `${(data?.data || []).length} gợi ý`, ms: Math.round(Date.now() - start) };
-          break;
-        }
-        case 'explain': {
-          const { data: prodData } = await api.get('/products?limit=1');
-          const products = prodData?.data?.products || [];
-          if (!products.length) { res = { status: 'fail', details: 'No products', ms: 0 }; break; }
-          const { data } = await api.post('/ml/explain', { userId: 'test', topN: 5 });
-          res = { status: 'pass', details: `${(data?.data?.recommendations || []).length} recs`, ms: Math.round(Date.now() - start) };
-          break;
-        }
-        case 'abtestLog': {
-          const { data: custData } = await api.get('/users?role=CUSTOMER&limit=1');
-          const customers = custData?.data?.users || [];
-          const { data: prodData2 } = await api.get('/products?limit=1');
-          const prods = prodData2?.data?.products || [];
-          if (!customers.length || !prods.length) { res = { status: 'fail', details: 'No sample data', ms: 0 }; break; }
-          const { data } = await api.post('/ml/abtest/log', { group: 'control', userId: customers[0].id, productId: prods[0].id, action: 'impression' });
-          res = { status: 'pass', details: 'Logged', ms: Math.round(Date.now() - start) };
-          break;
-        }
-        case 'abtestCompare': {
-          const { data } = await api.post('/ml/abtest/compare', { groupA: 'control', groupB: 'treatment' });
-          res = { status: 'pass', details: `Winner: ${data.data?.winner || 'tie'}`, ms: Math.round(Date.now() - start) };
-          break;
-        }
-        case 'abtestReport': {
-          const { data } = await api.get('/ml/abtest/report');
-          res = { status: 'pass', details: `Control: ${data.data?.control?.total_events || 0} events`, ms: Math.round(Date.now() - start) };
           break;
         }
         default:

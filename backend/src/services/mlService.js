@@ -5,7 +5,7 @@
  */
 
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';
-const REQUEST_TIMEOUT = 180000; // 180s timeout (CF train + Evaluate cần >60s với ALS)
+const REQUEST_TIMEOUT = 180000; // 180s timeout (session train / clustering cần >60s)
 
 const logger = require('../config/logger');
 
@@ -55,61 +55,6 @@ async function getServiceInfo() {
 }
 
 /**
- * Get collaborative filtering recommendations for a user
- * @param {Array} orders - [{user_id, product_id, quantity}]
- * @param {Array} products - [{id, name}]
- * @param {string} userId - Target user
- * @param {number} topN - Number of recommendations
- */
-async function getCFRecommendations(orders, products, userId, topN = 10) {
-  if (!orders.length || !products.length) return [];
-
-  const result = await callML('/cf/recommend', 'POST', {
-    user_id: userId,
-    orders: orders.map(o => ({
-      user_id: o.user_id,
-      product_id: o.product_id,
-      quantity: o.quantity || 1,
-    })),
-    products: products.map(p => ({ id: p.id, name: p.name || '' })),
-    top_n: topN,
-    strategy: 'hybrid',
-  });
-
-  if (result.success) {
-    return result.data?.recommendations || [];
-  }
-  return [];
-}
-
-/**
- * Get similar products using Item-Item CF
- * @param {string} productId - Target product
- * @param {Array} orders - [{user_id, product_id, quantity}]
- * @param {Array} products - [{id, name}]
- * @param {number} topN - Number of similar products
- */
-async function getSimilarProductsML(productId, orders, products, topN = 8) {
-  if (!orders.length || !products.length) return [];
-
-  const result = await callML('/cf/similar', 'POST', {
-    product_id: productId,
-    orders: orders.map(o => ({
-      user_id: o.user_id,
-      product_id: o.product_id,
-      quantity: o.quantity || 1,
-    })),
-    products: products.map(p => ({ id: p.id, name: p.name || '' })),
-    top_n: topN,
-  });
-
-  if (result.success) {
-    return result.data?.similar_products || [];
-  }
-  return [];
-}
-
-/**
  * Get cluster profiles from ML service
  */
 async function getClusterProfiles() {
@@ -145,8 +90,6 @@ async function runClustering(orders) {
 module.exports = {
   checkHealth,
   getServiceInfo,
-  getCFRecommendations,
-  getSimilarProductsML,
   getClusterProfiles,
   getClusterStats,
   runClustering,

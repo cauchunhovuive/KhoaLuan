@@ -1,45 +1,6 @@
 const { prisma } = require('../config/database');
 const { cacheGet, cacheSet } = require('../config/redis');
 const asyncHandler = require('../utils/asyncHandler');
-const mlService = require('../services/mlService');
-
-// Helper: build order/product data for ML service (cached 5 phút)
-const ML_DATA_CACHE_KEY = 'ml:buildData';
-
-async function buildMLData() {
-  const cached = await cacheGet(ML_DATA_CACHE_KEY);
-  if (cached) return cached;
-
-  const [orders, products] = await Promise.all([
-    prisma.orderItem.findMany({
-      take: 500,
-      orderBy: { order: { createdAt: 'desc' } },
-      select: {
-        order: { select: { id: true, userId: true } },
-        productId: true,
-        quantity: true,
-      },
-    }),
-    prisma.product.findMany({
-      where: { isActive: true },
-      select: { id: true, name: true },
-      take: 200,
-    }),
-  ]);
-
-  const result = {
-    orders: orders.map(o => ({
-      user_id: o.order.userId,
-      product_id: o.productId,
-      quantity: o.quantity,
-    })),
-    products: products.map(p => ({ id: p.id, name: p.name })),
-  };
-
-  // Cache 5 phút — dữ liệu ML không cần real-time
-  await cacheSet(ML_DATA_CACHE_KEY, result, 300);
-  return result;
-}
 
 // @desc    Get personalized recommendations for user
 // @route   GET /api/recommendations/personalized
@@ -52,37 +13,10 @@ const getPersonalizedRecommendations = asyncHandler(async (req, res) => {
     return res.json({ success: true, data: cached });
   }
 
-  let recommendedIds = [];
-
-  // Try ML service first for CF-based recommendations
-  try {
-    const mlData = await buildMLData();
-    const mlRecs = await mlService.getCFRecommendations(mlData.orders, mlData.products, userId, 10);
-    if (mlRecs.length > 0) {
-      recommendedIds = mlRecs.map(r => r.product_id);
-    }
-  } catch (e) {
-    // ML failed, fall through to local logic
-  }
-
   let products = [];
 
-  if (recommendedIds.length > 0) {
-    // Fetch product details for recommended IDs
-    const recProducts = await prisma.product.findMany({
-      where: { id: { in: recommendedIds }, isActive: true, stock: { gt: 0 } },
-      select: {
-        id: true, name: true, slug: true, price: true, discountPrice: true,
-        images: true, rating: true, soldCount: true,
-        category: { select: { id: true, name: true } },
-        partner: { select: { id: true, storeName: true } },
-      },
-    });
-    // Maintain ML sort order
-    const productMap = new Map(recProducts.map(p => [p.id, p]));
-    products = recommendedIds.map(id => productMap.get(id)).filter(Boolean);
-  } else {
-    // Fallback: Get user's cluster
+  {
+    // Primary: gợi ý theo cluster KMeans của user
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { clusterId: true },

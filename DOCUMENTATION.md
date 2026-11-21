@@ -19,11 +19,9 @@
 5. [ML Service (Python + FastAPI)](#5-ml-service)
    - 5.1 [Overview](#51-overview)
    - 5.2 [Clustering Engine](#52-clustering-engine)
-   - 5.3 [Collaborative Filtering](#53-collaborative-filtering)
-   - 5.4 [Session-Based Recommender](#54-session-based-recommender)
-   - 5.5 [Evaluation & A/B Testing](#55-evaluation--ab-testing)
-   - 5.6 [RAG Chat AI](#56-rag-chat-ai)
-   - 5.7 [ML Endpoints Summary](#57-ml-endpoints-summary)
+   - 5.3 [Session-Based Recommender](#53-session-based-recommender)
+   - 5.4 [RAG Chat AI](#54-rag-chat-ai)
+   - 5.5 [ML Endpoints Summary](#55-ml-endpoints-summary)
 6. [Database Schema (Prisma ORM)](#6-database-schema)
    - 6.1 [Enum Types](#61-enum-types)
    - 6.2 [Core Models](#62-core-models)
@@ -63,8 +61,7 @@
 KhoaLuan is a full-stack e-commerce platform with **3 user branches** (Admin, Partner, Customer) integrated with an **AI Recommendation Engine**. The system supports:
 
 - **Multi-vendor marketplace**: Partners manage their own shops and products
-- **AI-powered recommendations**: Session-based, Collaborative Filtering, Customer Clustering
-- **A/B Testing framework**: Compare recommendation strategies
+- **AI-powered recommendations**: Session-based, Customer Clustering
 - **RAG Chat AI**: Ollama + ChromaDB-powered chatbot for customer support
 - **Multi-payment gateways**: VNPay, MoMo, COD, Banking
 - **Multi-platform**: Web (React) + Mobile (React Native)
@@ -113,9 +110,7 @@ User Request → Nginx/Load Balancer → Express Backend
                                      ├── Redis Cache
                                      └── ML Service Proxy → Python FastAPI
                                                           ├── Clustering (K-Means/RFM)
-                                                          ├── Collaborative Filtering
                                                           ├── Session-Based
-                                                          ├── Evaluation & A/B Test
                                                           └── RAG → ChromaDB → Ollama
 ```
 
@@ -429,13 +424,6 @@ All routes are registered under `/api`:
 | GET | `/ml/health` | Public | ML service health check |
 | POST | `/ml/session/recommend` | Public | Session-based recommendations (auto-trains on first call) |
 | POST | `/ml/session/train` | ADMIN | Train session model from all product views |
-| POST | `/ml/cf/train` | ADMIN | Train CF models from order data |
-| POST | `/ml/explain` | ADMIN | Explain user's recommendations |
-| POST | `/ml/evaluate` | ADMIN | Evaluate models offline |
-| POST | `/ml/abtest/log` | Protected | Log A/B test interaction |
-| POST | `/ml/abtest/compare` | ADMIN | Compare A/B test groups |
-| GET | `/ml/abtest/report` | ADMIN | A/B test report |
-| POST | `/ml/abtest/reset` | ADMIN | Reset A/B test data |
 
 #### Audit Controller (`auditController.js`)
 | Method | Endpoint | Auth | Description |
@@ -469,7 +457,7 @@ Proxies requests from Node.js backend to Python FastAPI ML service:
 callML(endpoint, method, body) → fetch to ML_SERVICE_URL + endpoint
 ```
 
-- **Timeout:** 180 seconds (CF training + evaluation requires >60s)
+- **Timeout:** 180 seconds
 - **Fallback:** Returns `{ success: false, error }` on failure
 - **All ML calls go through this proxy**
 
@@ -477,8 +465,6 @@ callML(endpoint, method, body) → fetch to ML_SERVICE_URL + endpoint
 |----------|-------------|
 | `checkHealth()` | Health check |
 | `getServiceInfo()` | Get models info |
-| `getCFRecommendations(orders, products, userId, topN)` | CF recs for user |
-| `getSimilarProductsML(productId, orders, products, topN)` | Similar products |
 | `getClusterProfiles()` | Cluster profiles |
 | `getClusterStats()` | Cluster stats |
 | `runClustering(orders)` | Run K-Means clustering |
@@ -549,14 +535,11 @@ Maps error types to Vietnamese messages:
 
 **File:** `backend/ml/clustering/api.py`
 
-The ML Service is a Python FastAPI application running on port 8000. It provides 5 model groups:
+The ML Service is a Python FastAPI application running on port 8000. It provides 3 model groups:
 
 1. **Clustering** - RFM Analysis + K-Means
-2. **Collaborative Filtering** - 4 models (Item-Item, User-User, ALS, Hybrid)
-3. **Session-Based** - Co-occurrence + Sequence Prediction
-4. **Evaluation** - Offline metrics computation
-5. **A/B Testing** - Statistical comparison framework
-6. **RAG Chat AI** - ChromaDB + Ollama
+2. **Session-Based** - Co-occurrence + Sequence Prediction
+3. **RAG Chat AI** - ChromaDB + Ollama
 
 ### 5.2 Clustering Engine
 
@@ -587,34 +570,7 @@ The ML Service is a Python FastAPI application running on port 8000. It provides
 - `GET /cluster/profiles` - Get cluster profile descriptions
 - `GET /cluster/stats` - Get cluster statistics
 
-### 5.3 Collaborative Filtering
-
-**File:** `backend/ml/collaborative/collaborative_filtering.py`
-
-Four models implemented:
-
-| Model | Technique | Description |
-|-------|-----------|-------------|
-| **Item-Item CF** | Cosine Similarity | Find similar items based on co-purchase patterns |
-| **User-User CF** | User Similarity | Find similar users, recommend their items |
-| **ALS Matrix Factorization** | Alternating Least Squares | Matrix factorization for implicit feedback |
-| **Hybrid** | Weighted Ensemble | Weighted combination: item=0.3, user=0.3, als=0.4 |
-
-**Implementation Details:**
-- User-Product matrix built from order data
-- Sparse matrix representation (scipy sparse)
-- Cosine similarity for Item-Item and User-User
-- ALS: Regularized matrix factorization with implicit feedback
-- Hybrid: Weighted average of all model scores
-
-**Endpoints:**
-- `POST /cf/train` - Train all 4 models
-- `POST /cf/recommend` - Recommend for user (choose strategy)
-- `POST /cf/similar` - Similar products via Item-Item CF
-- `POST /cf/recommend/hybrid` - Hybrid recommendation
-- `POST /cf/explain` - Explain recommendations with model weights
-
-### 5.4 Session-Based Recommender
+### 5.3 Session-Based Recommender
 
 **File:** `backend/ml/session/session_recommender.py`
 
@@ -641,46 +597,7 @@ Two strategies:
 4. Hybrid: Weighted combination (co-occurrence=0.6, sequence=0.4)
 5. Exclude items already in session
 
-### 5.5 Evaluation & A/B Testing
-
-**File:** `backend/ml/evaluation/metrics.py`
-
-#### Offline Evaluation Metrics
-
-| Metric | Description |
-|--------|-------------|
-| Precision@K | Proportion of recommended items that are relevant |
-| Recall@K | Proportion of relevant items that are recommended |
-| F1 Score | Harmonic mean of precision and recall |
-| Hit Rate | Proportion of users with at least 1 relevant recommendation |
-| MAP (Mean Average Precision) | Average precision across all users |
-| NDCG (Normalized Discounted Cumulative Gain) | Ranking quality metric |
-| Coverage | Proportion of products that can be recommended |
-| Popularity Bias | How much recommendations favor popular items |
-
-**Methodology:**
-- Train/test split by time (80/20 default)
-- Train on historical data, test on future interactions
-- For each test user: recommend top-K, compare with actual purchases
-
-#### A/B Testing Framework
-
-| Feature | Description |
-|---------|-------------|
-| Groups | Control vs Treatment |
-| Actions | impression, click, add_to_cart, purchase |
-| Metrics | Conversion rate, revenue, click-through rate |
-| Statistical Test | Chi-squared test for conversion comparison |
-
-**Endpoints:**
-- `POST /evaluate/offline` - Run offline evaluation
-- `POST /abtest/log` - Log user interaction
-- `POST /abtest/log_batch` - Batch log interactions
-- `GET /abtest/report` - Get summary report
-- `POST /abtest/compare` - Compare two groups
-- `POST /abtest/reset` - Reset all data
-
-### 5.6 RAG Chat AI
+### 5.4 RAG Chat AI
 
 **Files:**
 - `backend/ml/rag/knowledge_base.py` - ChromaDB vector store
@@ -721,7 +638,7 @@ Response (answer + sources)
 - `POST /rag/build` - Build/rebuild knowledge base
 - `GET /rag/status` - KB stats + Ollama connection status
 
-### 5.7 ML Endpoints Summary
+### 5.5 ML Endpoints Summary
 
 | Endpoint | Method | Description | Auth | Avg Time |
 |----------|--------|-------------|:----:|:--------:|
@@ -732,19 +649,8 @@ Response (answer + sources)
 | `/cluster/recommend` | POST | Recommend for cluster | ADMIN | 100ms |
 | `/cluster/profiles` | GET | Cluster profiles | Public | 2ms |
 | `/cluster/stats` | GET | Cluster stats | Public | 2ms |
-| `/cf/train` | POST | Train 4 CF models | ADMIN | 2,000ms |
-| `/cf/recommend` | POST | CF recommend for user | Public | 80ms |
-| `/cf/similar` | POST | Similar products | Public | 50ms |
-| `/cf/recommend/hybrid` | POST | Hybrid recommend | Public | 80ms |
-| `/cf/explain` | POST | Explain recommendations | ADMIN | 5,500ms |
 | `/session/train` | POST | Train session model | ADMIN | 20ms |
 | `/session/recommend` | POST | Session recommend | Public | 80ms |
-| `/evaluate/offline` | POST | Evaluate models | ADMIN | 4,000ms |
-| `/abtest/log` | POST | Log interaction | Protected | 10ms |
-| `/abtest/log_batch` | POST | Batch log | Protected | 15ms |
-| `/abtest/report` | GET | A/B test report | ADMIN | 6ms |
-| `/abtest/compare` | POST | Compare groups | ADMIN | 10ms |
-| `/abtest/reset` | POST | Reset A/B data | ADMIN | 5ms |
 | `/rag/ask` | POST | Ask AI question | Public | 3,000ms |
 | `/rag/chat` | POST | Chat with AI | Public | 3,000ms |
 | `/rag/build` | POST | Build KB | ADMIN | varies |
@@ -1228,9 +1134,7 @@ All admin pages are lazy-loaded with `React.lazy()` + `<Suspense>`:
 | **ViolationManagementPage** | `/admin/violations` | Violation reports, penalties |
 | **AuditLogPage** | `/admin/audit` | Audit log viewer with filters |
 | **ClustersPage** | `/admin/clusters` | Customer clusters, rules, run clustering |
-| **RecommendationsPage** | `/admin/recommendations` | Train CF, session, evaluate, explain |
-| **ABTestingPage** | `/admin/abtest` | A/B test control, comparison, report |
-| **MLTestPage** | `/admin/ml-test` | Auto-test 13 ML endpoints, results |
+| **MLTestPage** | `/admin/ml-test` | Auto-test 6 ML endpoints, results |
 | **SettingsPage** | `/admin/settings` | System configuration |
 
 ### 7.6 Partner Pages (7 Modules)
@@ -1358,10 +1262,8 @@ LoginScreen, RegisterScreen
 | AdminPartnersScreen | Đối tác |
 | AdminRefundsScreen | Hoàn tiền |
 | AdminViolationsScreen | Vi phạm |
-| AdminRecommendationsScreen | Gợi ý |
 | AdminClustersScreen | Phân cụm |
 | AdminMLTestScreen | Kiểm tra ML |
-| AdminABTestingScreen | A/B Test |
 | AdminAuditLogScreen | Audit Log |
 | AdminSettingsScreen | Cài đặt |
 
@@ -1498,7 +1400,7 @@ The project includes 5 seed scripts run in sequence:
 | `seed-new-models.js` | New features | Banners, flash sales, refunds, violations, audit logs, notifications, settings, addresses, conversations |
 | `seed-images.js` | Image data | Image URLs for products |
 | `seed-ml-test.js` | ML data | 281 product views, orders for ML testing |
-| `test-ml-all.js` | Auto-test | Tests all 13 ML endpoints (not seed, just test) |
+| `test-ml-all.js` | Auto-test | Tests all 10 ML endpoints (not seed, just test) |
 
 **Seed Data Summary:**
 
@@ -1590,35 +1492,16 @@ docker exec khoaluan-backend sh -c "node prisma/test-ml-all.js"
 
 ## 12. ML Test Results
 
-**Latest:** 13/13 passed (100%) — ~19 seconds total
+**Latest:** 6/6 passed (100%)
 
 | # | Test | Status | Time |
 |:-:|------|:------:|:----:|
 | 1 | ML Health | ✅ | 2ms |
 | 2 | ML Engine Info | ✅ | 2ms |
 | 3 | Train Session (282 views) | ✅ | 22ms |
-| 4 | Train CF (98 orders, 101 products) | ✅ | 2,045ms |
-| 5 | Evaluate Models | ✅ | 4,154ms |
-| 6 | Run Clustering (4 clusters) | ✅ | 203ms |
-| 7 | Trending Products | ✅ | 2ms |
-| 8 | Session Recommend | ✅ | 83ms |
-| 9 | Explain Recommendations | ✅ | 5,533ms |
-| 10 | A/B Test Log | ✅ | 16ms |
-| 11 | A/B Test Log 2 | ✅ | 15ms |
-| 12 | A/B Test Compare | ✅ | 9ms |
-| 13 | A/B Test Report | ✅ | 6ms |
-
-**Metrics (sample):**
-| Metric | Value |
-|--------|:-----:|
-| Precision | 0.014 |
-| Recall | 0.036 |
-| F1 Score | 0.020 |
-| Hit Rate | 0.143 |
-| MAP Score | 0.007 |
-| NDCG Score | 0.022 |
-| Coverage | 0.465 |
-| Popularity Bias | 0.157 |
+| 4 | Run Clustering (4 clusters) | ✅ | 203ms |
+| 5 | Trending Products | ✅ | 2ms |
+| 6 | Session Recommend | ✅ | 83ms |
 
 ---
 
@@ -1678,9 +1561,8 @@ All list endpoints use 10 items per page by default with page/limit pagination:
 ### ML Test/Demo Utilities
 | File | Purpose |
 |------|---------|
-| `ml/demo_test.py` | Quick demo script for ML models (run standalone) |
-| `ml/live_test.py` | Live integration test with database |
-| `ml/test_api.py` | End-to-end API test script for ML service |
+| `ml/test_hsp_ric_smoke.py` | Smoke test cho HSP/RIC session strategies |
+| `ml/test_hsp_ric_online.py` | Test HSP/RIC online với dữ liệu thật |
 
 ### Seed Scripts (6 total)
 | Script | Purpose |
@@ -1690,7 +1572,7 @@ All list endpoints use 10 items per page by default with page/limit pagination:
 | `prisma/seed-new-models.js` | New feature seeds (banners, flash sales, refunds, violations, etc.) |
 | `prisma/seed-images.js` | Image URLs for products |
 | `prisma/seed-ml-test.js` | ML test data (281 product views) |
-| `prisma/test-ml-all.js` | Auto-test all 13 ML endpoints (run with `node prisma/test-ml-all.js`) |
+| `prisma/test-ml-all.js` | Auto-test all 10 ML endpoints (run with `node prisma/test-ml-all.js`) |
 
 ---
 
@@ -1728,19 +1610,15 @@ KHOALUAN/
 │   │   ├── seed-full.js                  # Extended seed data
 │   │   ├── seed-new-models.js            # New feature seeds
 │   │   ├── seed-ml-test.js              # ML test data
-│   │   └── test-ml-all.js               # Auto-test 13 ML endpoints
+│   │   └── test-ml-all.js               # Auto-test 10 ML endpoints
 │   └── ml/                               # Python ML Service
 │       ├── Dockerfile.ml
 │       ├── requirements.txt
 │       ├── clustering/
 │       │   ├── api.py                    # FastAPI app + all endpoints
 │       │   └── clustering_service.py     # RFM + K-Means
-│       ├── collaborative/
-│       │   └── collaborative_filtering.py # Item-Item, User-User, ALS, Hybrid
 │       ├── session/
 │       │   └── session_recommender.py    # Co-occurrence + Sequence
-│       ├── evaluation/
-│       │   └── metrics.py               # Metrics + A/B Test
 │       └── rag/
 │           ├── knowledge_base.py         # ChromaDB vector store
 │           ├── rag_service.py            # RAG pipeline + Ollama

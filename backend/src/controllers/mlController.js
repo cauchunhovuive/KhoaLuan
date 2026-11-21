@@ -9,7 +9,7 @@ const mlService = require('../services/mlService');
 // @desc    Get session-based recommendations for a user's current browsing
 // @route   POST /api/ml/session/recommend
 const getSessionRecommendations = asyncHandler(async (req, res) => {
-  const { sessionItems, topN = 10, strategy = 'hybrid', alpha = null } = req.body;
+  const { sessionItems, topN = 10, strategy = 'hybrid', alpha = null, excludeSessionItems = true } = req.body;
 
   if (!sessionItems || !sessionItems.length) {
     return res.json({ success: true, data: [] });
@@ -23,11 +23,13 @@ const getSessionRecommendations = asyncHandler(async (req, res) => {
   });
 
   // Try to get view logs for training (if ProductView model exists)
+  // Lấy 5000 logs gần nhất — trước đây 1000 logs chỉ dựng được ~20 phiên
+  // (phiên bị cắt cụt ở rìa cửa sổ), model HSP/RIC học thiếu quan hệ.
   let recentViews = [];
   try {
     if (prisma.productView) {
       recentViews = await prisma.productView.findMany({
-        take: 1000,
+        take: 10000,  // dùng tối đa data cho model session (đồng bộ /session/train)
         orderBy: { createdAt: 'desc' },
         select: { userId: true, productId: true, createdAt: true },
       });
@@ -36,10 +38,13 @@ const getSessionRecommendations = asyncHandler(async (req, res) => {
     // ProductView model may not exist yet
   }
 
-  // Auto-train session model nếu có view logs (idempotent — ML service bỏ qua nếu đã train)
+  // Gửi view_logs kèm MỌI request: Python service tự quyết định có fit lại
+  // không (model chưa có / model yếu hơn data / data mới hơn model). Trước đây
+  // chỉ gửi khi model chưa có → model yếu 22 phiên bị "kẹt" mãi mãi.
   if (recentViews.length > 0) {
     try {
       await mlService.callML('/session/train', 'POST', {
+        force: false,
         view_logs: recentViews.map(v => ({
           user_id: v.userId,
           product_id: v.productId,
@@ -65,6 +70,9 @@ const getSessionRecommendations = asyncHandler(async (req, res) => {
       products: products.map(p => ({ id: p.id, name: p.name })),
       top_n: topN,
       strategy,
+      // UI thật: không gợi ý lại các sản phẩm khách đã xem trong phiên
+      // (benchmark offline để false — đo MRR/Recall đúng protocol bài báo)
+      exclude_session_items: !!excludeSessionItems,
       ...(alpha != null ? { alpha } : {}),
     });
 
@@ -116,9 +124,6 @@ async function enrichRecommendations(recommendations) {
         probability: r.probability,
         reason: r.reason,
         hsp_level: r.hsp_level,
-        gcn_score: r.gcn_score,
-        cf_score: r.cf_score,
-        fusion_weight: r.fusion_weight,
       };
     })
     .filter(Boolean);
@@ -131,7 +136,7 @@ const trainSessionModel = asyncHandler(async (req, res) => {
   try {
     if (prisma.productView) {
       recentViews = await prisma.productView.findMany({
-        take: 5000,
+        take: 10000,
         orderBy: { createdAt: 'desc' },
         select: { userId: true, productId: true, createdAt: true },
       });
@@ -145,6 +150,7 @@ const trainSessionModel = asyncHandler(async (req, res) => {
   }
 
   const result = await mlService.callML('/session/train', 'POST', {
+    force: req.body?.force === true,
     view_logs: recentViews.map(v => ({
       user_id: v.userId,
       product_id: v.productId,
@@ -163,342 +169,29 @@ const trainSessionModel = asyncHandler(async (req, res) => {
 });
 
 // ============================================================
-// Collaborative Filtering — Train & Explain
-// ============================================================
-
-/**
- * Helper: fetch order + product data for CF training
- */
-async function getCFTrainingData() {
-  const [orders, products] = await Promise.all([
-    prisma.orderItem.findMany({
-      take: 2000,
-      orderBy: { order: { createdAt: 'desc' } },
-      select: {
-        order: { select: { id: true, userId: true } },
-        productId: true,
-        quantity: true,
-      },
-    }),
-    prisma.product.findMany({
-      where: { isActive: true },
-      select: { id: true, name: true },
-      take: 500,
-    }),
-  ]);
-  return { orders, products };
-}
-
-/**
- * Helper: build CF data payload for ML service
- */
-function buildCFPayload(orders, products) {
-  return {
-    orders: orders.map(o => ({
-      user_id: o.order?.userId || o.user_id,
-      product_id: o.productId || o.product_id,
-      quantity: o.quantity || 1,
-    })),
-    products: products.map(p => ({ id: p.id, name: p.name })),
-  };
-}
-
-// @desc    Train CF models (Item-Item, User-User, ALS, Hybrid)
-// @route   POST /api/ml/cf/train
-const trainCFModel = asyncHandler(async (req, res) => {
-  const { orders, products } = await getCFTrainingData();
-
-  if (orders.length < 5) {
-    return res.json({
-      success: true,
-      data: { message: 'Không đủ dữ liệu để train CF (cần ít nhất 5 đơn hàng).', trained: false },
-    });
-  }
-
-  const result = await mlService.callML('/cf/train', 'POST', buildCFPayload(orders, products));
-
-  res.json({
-    success: true,
-    data: {
-      message: result.data?.message || 'CF models trained',
-      trained: result.success,
-      n_orders: result.data?.n_orders || orders.length,
-      n_products: result.data?.n_products || products.length,
-      models: result.data?.models || [],
-    },
-  });
-});
-
-// @desc    Explain ML recommendations for a user (auto-trains CF first)
-// @route   POST /api/ml/explain
-const explainRecommendations = asyncHandler(async (req, res) => {
-  const { userId, topN = 10 } = req.body;
-
-  if (!userId) {
-    return res.status(400).json({ success: false, message: 'Thiếu userId' });
-  }
-
-  const { orders, products } = await getCFTrainingData();
-
-  if (orders.length === 0) {
-    return res.json({ success: true, data: { recommendations: [], weights: {} } });
-  }
-
-  // Auto-train CF model before explaining
-  const trainResult = await mlService.callML('/cf/train', 'POST', buildCFPayload(orders, products));
-  if (!trainResult.success) {
-    return res.json({ success: true, data: { recommendations: [], weights: {}, error: 'CF training failed' } });
-  }
-
-  const result = await mlService.callML('/cf/explain', 'POST', {
-    user_id: userId,
-    orders: orders.map(o => ({
-      user_id: o.order?.userId || o.user_id,
-      product_id: o.productId || o.product_id,
-      quantity: o.quantity || 1,
-    })),
-    products: products.map(p => ({ id: p.id, name: p.name })),
-    top_n: topN,
-  });
-
-  res.json(result);
-});
-
-// ============================================================
-// Graph CF & LightGCN-CF (Li & Zhang 2025)
-// ============================================================
-
-// @desc    Train Graph CF model (LightGCN-like, numpy/scipy — không cần PyTorch)
-// @route   POST /api/ml/graphcf/train
-const trainGraphCFModel = asyncHandler(async (req, res) => {
-  const { orders, products } = await getCFTrainingData();
-
-  if (orders.length < 5) {
-    return res.json({
-      success: true,
-      data: { message: 'Không đủ dữ liệu để train Graph CF (cần ít nhất 5 đơn hàng).', trained: false },
-    });
-  }
-
-  const result = await mlService.callML('/graphcf/train', 'POST', buildCFPayload(orders, products));
-
-  res.json({
-    success: true,
-    data: {
-      message: result.data?.message || 'Graph CF trained',
-      trained: result.success,
-      n_orders: result.data?.n_orders || orders.length,
-      n_products: result.data?.n_products || products.length,
-    },
-  });
-});
-
-// @desc    Recommend by Graph CF (auto-train)
-// @route   POST /api/ml/graphcf/recommend
-const recommendGraphCF = asyncHandler(async (req, res) => {
-  const { userId, topN = 10 } = req.body;
-
-  if (!userId) {
-    return res.status(400).json({ success: false, message: 'Thiếu userId' });
-  }
-
-  const { orders, products } = await getCFTrainingData();
-  const payload = buildCFPayload(orders, products);
-
-  const result = await mlService.callML('/graphcf/recommend', 'POST', {
-    ...payload,
-    user_id: userId,
-    top_n: topN,
-  });
-
-  const recommendations = result.data?.recommendations || [];
-  const recommendedProducts = await enrichRecommendations(recommendations);
-
-  res.json({
-    success: true,
-    data: {
-      user_id: userId,
-      strategy: 'graph_cf',
-      recommendations: recommendedProducts,
-    },
-  });
-});
-
-// @desc    Train LightGCN-CF model (PyTorch, GCN + CF + BPR)
-// @route   POST /api/ml/lightgcncf/train
-const trainLightGCNCFModel = asyncHandler(async (req, res) => {
-  const { orders, products } = await getCFTrainingData();
-
-  if (orders.length < 5) {
-    return res.json({
-      success: true,
-      data: { message: 'Không đủ dữ liệu để train LightGCN-CF (cần ít nhất 5 đơn hàng).', trained: false },
-    });
-  }
-
-  const result = await mlService.callML('/lightgcncf/train', 'POST', buildCFPayload(orders, products));
-
-  res.json({
-    success: true,
-    data: {
-      message: result.data?.message || 'LightGCN-CF trained',
-      trained: result.success,
-      n_orders: result.data?.n_orders || orders.length,
-      n_products: result.data?.n_products || products.length,
-    },
-  });
-});
-
-// @desc    Recommend by LightGCN-CF (auto-train)
-// @route   POST /api/ml/lightgcncf/recommend
-const recommendLightGCNCF = asyncHandler(async (req, res) => {
-  const { userId, topN = 10 } = req.body;
-
-  if (!userId) {
-    return res.status(400).json({ success: false, message: 'Thiếu userId' });
-  }
-
-  const { orders, products } = await getCFTrainingData();
-  const payload = buildCFPayload(orders, products);
-
-  const result = await mlService.callML('/lightgcncf/recommend', 'POST', {
-    ...payload,
-    user_id: userId,
-    top_n: topN,
-  });
-
-  const recommendations = result.data?.recommendations || [];
-  const recommendedProducts = await enrichRecommendations(recommendations);
-
-  res.json({
-    success: true,
-    data: {
-      user_id: userId,
-      strategy: 'lightgcn_cf',
-      recommendations: recommendedProducts,
-    },
-  });
-});
-
-// ============================================================
-// Offline Evaluation
-// ============================================================
-
-// @desc    Run offline evaluation of recommendation models
-// @route   POST /api/ml/evaluate
-const evaluateModels = asyncHandler(async (req, res) => {
-  const { topN = 10 } = req.body;
-
-  // Build order and product data
-  const [orders, products] = await Promise.all([
-    prisma.orderItem.findMany({
-      take: 1000,
-      orderBy: { order: { createdAt: 'desc' } },
-      select: {
-        order: { select: { id: true, userId: true, createdAt: true } },
-        productId: true,
-        quantity: true,
-      },
-    }),
-    prisma.product.findMany({
-      where: { isActive: true },
-      select: { id: true, name: true },
-      take: 200,
-    }),
-  ]);
-
-  if (orders.length < 10) {
-    return res.json({
-      success: true,
-      data: { message: 'Không đủ dữ liệu để đánh giá (cần ít nhất 10 đơn hàng)' },
-    });
-  }
-
-  const result = await mlService.callML('/evaluate/offline', 'POST', {
-    orders: orders.map(o => ({
-      user_id: o.order.userId,
-      product_id: o.productId,
-      quantity: o.quantity,
-      created_at: o.order.createdAt?.toISOString() || '2024-01-01',
-    })),
-    products: products.map(p => ({ id: p.id, name: p.name })),
-    top_n: topN,
-  });
-
-  res.json(result);
-});
-
-// ============================================================
-// A/B Testing
-// ============================================================
-
-// @desc    Get A/B test report
-// @route   GET /api/ml/abtest/report
-const getABTestReport = asyncHandler(async (req, res) => {
-  const result = await mlService.callML('/abtest/report');
-  res.json(result);
-});
-
-// @desc    Log A/B test interaction
-// @route   POST /api/ml/abtest/log
-const logABTestInteraction = asyncHandler(async (req, res) => {
-  const { group, userId, productId, action, revenue = 0 } = req.body;
-
-  const result = await mlService.callML('/abtest/log', 'POST', {
-    group,
-    user_id: userId,
-    product_id: productId,
-    action,
-    revenue,
-    timestamp: new Date().toISOString(),
-  });
-
-  res.json(result);
-});
-
-// @desc    Compare A/B test groups
-// @route   POST /api/ml/abtest/compare
-const compareABTestGroups = asyncHandler(async (req, res) => {
-  const { groupA = 'control', groupB = 'treatment' } = req.body;
-
-  const result = await mlService.callML(`/abtest/compare?group_a=${groupA}&group_b=${groupB}`, 'POST');
-  res.json(result);
-});
-
-// @desc    Reset A/B test data
-// @route   POST /api/ml/abtest/reset
-const resetABTest = asyncHandler(async (req, res) => {
-  const result = await mlService.callML('/abtest/reset', 'POST');
-  res.json(result);
-});
-
-// ============================================================
 // ML Service Health & Info
 // ============================================================
 
-// ============================================================
-// Paper Data & Benchmark (Yoochoose — Delianidi 2023)
-// ============================================================
-
-// @desc    Thống kê dataset Yoochoose dùng cho benchmark bài báo
-// @route   GET /api/ml/paper/data
+// @desc    Check ML service health
+// @route   GET /api/ml/paper/data?dataset=yoochoose
 const getPaperData = asyncHandler(async (req, res) => {
-  const result = await mlService.callML('/session/paper-data');
+  const ds = req.query?.dataset ? `?dataset=${encodeURIComponent(req.query.dataset)}` : '';
+  const result = await mlService.callML(`/session/paper-data${ds}`);
   res.json(result);
 });
 
-// @desc    Chạy benchmark HSP & RIC trên Yoochoose (dataset bài báo)
+// @desc    Chạy benchmark HSP & RIC trên dataset bài báo (yoochoose | diginetica)
 // @route   POST /api/ml/paper/benchmark
 const runPaperBenchmark = asyncHandler(async (req, res) => {
-  const { maxTest = 500 } = req.body;
-  const result = await mlService.callML('/session/benchmark', 'POST', { max_test: maxTest });
+  const { maxTest = 500, dataset = 'yoochoose' } = req.body;
+  const result = await mlService.callML('/session/benchmark', 'POST', { max_test: maxTest, dataset });
   res.json(result);
 });
 
-// @desc    Gợi ý bằng model train sẵn trên dataset Yoochoose (bài báo)
+// @desc    Gợi ý bằng model train sẵn trên dataset bài báo (yoochoose | diginetica)
 // @route   POST /api/ml/paper/recommend
 const paperRecommend = asyncHandler(async (req, res) => {
-  const { sessionItems, topN = 10, strategy = 'hybrid', alpha = null } = req.body;
+  const { sessionItems, topN = 10, strategy = 'hybrid', alpha = null, dataset = 'yoochoose' } = req.body;
 
   if (!sessionItems || !sessionItems.length) {
     return res.status(400).json({ success: false, message: 'Thiếu sessionItems' });
@@ -508,15 +201,29 @@ const paperRecommend = asyncHandler(async (req, res) => {
     session_items: sessionItems,
     top_n: topN,
     strategy,
+    dataset,
     ...(alpha != null ? { alpha } : {}),
   });
   res.json(result);
 });
 
-// @desc    Reset model + cache benchmark Yoochoose (lần sau train lại từ đầu)
+// @desc    Reset model + cache benchmark (1 dataset hoặc tất cả — lần sau train lại từ đầu)
 // @route   POST /api/ml/paper/reset
 const resetPaperBenchmark = asyncHandler(async (req, res) => {
-  const result = await mlService.callML('/session/benchmark/reset', 'POST');
+  const { dataset = 'all' } = req.body || {};
+  const result = await mlService.callML(`/session/benchmark/reset?dataset=${encodeURIComponent(dataset)}`, 'POST');
+  res.json(result);
+});
+
+// @desc    Model bài báo đã học được gì — P0/P1/P2 + γ với phân số đếm thô (demo bài báo)
+// @route   POST /api/ml/paper/insights
+const paperInsights = asyncHandler(async (req, res) => {
+  const { sessionItems = [], topK = 4, dataset = 'yoochoose' } = req.body || {};
+  const result = await mlService.callML('/session/paper-insights', 'POST', {
+    session_items: sessionItems,
+    top_k: topK,
+    dataset,
+  });
   res.json(result);
 });
 
@@ -538,20 +245,5 @@ const getMLHealth = asyncHandler(async (req, res) => {
 module.exports = {
   getSessionRecommendations,
   trainSessionModel,
-  trainCFModel,
-  trainGraphCFModel,
-  recommendGraphCF,
-  trainLightGCNCFModel,
-  recommendLightGCNCF,
-  explainRecommendations,
-  evaluateModels,
-  getABTestReport,
-  logABTestInteraction,
-  compareABTestGroups,
-  resetABTest,
   getMLHealth,
-  getPaperData,
-  runPaperBenchmark,
-  resetPaperBenchmark,
-  paperRecommend,
 };

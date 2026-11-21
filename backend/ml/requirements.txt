@@ -8,7 +8,7 @@ sqlalchemy==2.0.25
 python-dotenv==1.0.0
 pydantic==2.5.3
 
-# LightGCN-CF (Li & Zhang 2025) — yêu cầu PyTorch.
+# PyTorch — cần cho sentence-transformers (RAG)
 # Docker: cài CPU wheel trước bằng --index-url https://download.pytorch.org/whl/cpu (xem Dockerfile.ml)
 # Local: `pip install torch` (PyTorch chạy được trên CPU lẫn GPU)
 torch>=2.0

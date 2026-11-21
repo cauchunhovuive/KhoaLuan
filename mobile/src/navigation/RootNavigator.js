@@ -47,10 +47,8 @@ import AdminCouponsScreen from '../screens/admin/AdminCouponsScreen';
 import AdminPartnersScreen from '../screens/admin/AdminPartnersScreen';
 import AdminRefundsScreen from '../screens/admin/AdminRefundsScreen';
 import AdminViolationsScreen from '../screens/admin/AdminViolationsScreen';
-import AdminRecommendationsScreen from '../screens/admin/AdminRecommendationsScreen';
 import AdminClustersScreen from '../screens/admin/AdminClustersScreen';
 import AdminMLTestScreen from '../screens/admin/AdminMLTestScreen';
-import AdminABTestingScreen from '../screens/admin/AdminABTestingScreen';
 import AdminAuditLogScreen from '../screens/admin/AdminAuditLogScreen';
 import AdminSettingsScreen from '../screens/admin/AdminSettingsScreen';
 
@@ -108,10 +106,8 @@ function AdminStack() {
       <Stack.Screen name="AdminPartners" component={AdminPartnersScreen} options={{ title: 'Đối tác' }} />
       <Stack.Screen name="AdminRefunds" component={AdminRefundsScreen} options={{ title: 'Hoàn tiền' }} />
       <Stack.Screen name="AdminViolations" component={AdminViolationsScreen} options={{ title: 'Vi phạm' }} />
-      <Stack.Screen name="AdminRecommendations" component={AdminRecommendationsScreen} options={{ title: 'Gợi ý' }} />
       <Stack.Screen name="AdminClusters" component={AdminClustersScreen} options={{ title: 'Phân cụm' }} />
       <Stack.Screen name="AdminMLTest" component={AdminMLTestScreen} options={{ title: 'Kiểm tra ML' }} />
-      <Stack.Screen name="AdminABTesting" component={AdminABTestingScreen} options={{ title: 'A/B Test' }} />
       <Stack.Screen name="AdminAuditLog" component={AdminAuditLogScreen} options={{ title: 'Audit Log' }} />
       <Stack.Screen name="AdminSettings" component={AdminSettingsScreen} options={{ title: 'Cài đặt' }} />
     </Stack.Navigator>

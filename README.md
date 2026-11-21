@@ -1,6 +1,6 @@
 # 🛒 KhoaLuan — Hệ thống Thương mại Điện tử 3 Nhánh + AI
 
-**Đề tài:** Hệ thống thương mại điện tử với 3 nhánh người dùng (Admin, Đối tác kinh doanh, Khách hàng) kết hợp **AI Recommendation Engine** (Session-based, Collaborative Filtering, Customer Clustering, A/B Testing).
+**Đề tài:** Hệ thống thương mại điện tử với 3 nhánh người dùng (Admin, Đối tác kinh doanh, Khách hàng) kết hợp **AI Recommendation Engine** (Session-based, Customer Clustering).
 
 ---
 
@@ -199,9 +199,7 @@ Admin có toàn quyền quản lý hệ thống qua dashboard. **Admin không qu
 | 👥 **Quản lý người dùng** | Xem, sửa, phân quyền người dùng (10/trang) |
 | 🤝 **Quản lý đối tác** | Phê duyệt / từ chối đối tác mới đăng ký |
 | 🎯 **Phân cụm khách hàng** | Tạo nhóm, chạy phân cụm K-Means/RFM qua ML Service |
-| 💡 **Gợi ý sản phẩm** | Huấn luyện Session, CF, đánh giá mô hình, test gợi ý |
-| 🧪 **Kiểm tra ML** | Tự động chạy 16 ML endpoints (gồm HSP/RIC, LightGCN-CF, Graph CF), báo cáo kết quả |
-| 📊 **A/B Test** | So sánh Control vs Treatment, xem báo cáo |
+| 🧪 **Kiểm tra ML** | Tự động chạy 6 ML endpoints (gồm HSP/RIC), báo cáo kết quả |
 | 🏆 **Mã giảm giá** | CRUD mã giảm giá, theo dõi lượt sử dụng (10/trang) |
 | 🖼️ **Banner** | Quản lý banner trang chủ (vị trí, link, màu nền) |
 | ⚡ **Flash Sale** | Tạo sự kiện flash sale, thêm/xóa sản phẩm |
@@ -268,17 +266,13 @@ ML Service chạy riêng biệt với backend (Python + FastAPI), cung cấp 4 n
 │  mlService.js → callML() → proxy request → fetch(60s timeout)    │
 ├─────────────────────────────────────────────────────────────────┤
 │                    ML Service (Python FastAPI)                    │
-│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐     │
-│  │  Session-based  │  │ Collaborative  │  │   Clustering    │     │
-│  │  Co-occurrence  │  │  Item-Item CF  │  │      RFM        │     │
-│  │  Sequence Pred  │  │  User-User CF  │  │ + K-Means      │     │
-│  │                 │  │  ALS Matrix    │  │                 │     │
-│  │  281 views      │  │  Hybrid        │  │   4 clusters    │     │
-│  └────────────────┘  └────────────────┘  └────────────────┘     │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │              A/B Testing Framework                       │   │
-│  │  Log → Compare (Control vs Treatment) → Report           │   │
-│  └──────────────────────────────────────────────────────────┘   │
+│  ┌───────────────────────────┐  ┌───────────────────────────┐     │
+│  │      Session-based        │  │        Clustering         │     │
+│  │  Co-occurrence            │  │        RFM                │     │
+│  │  Sequence Pred            │  │    + K-Means              │     │
+│  │  HSP · RIC                │  │                           │     │
+│  │  281 views                │  │      4 clusters           │     │
+│  └───────────────────────────┘  └───────────────────────────┘     │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -292,48 +286,28 @@ ML Service chạy riêng biệt với backend (Python + FastAPI), cung cấp 4 n
 | `POST /cluster/run` | Chạy phân cụm K-Means + RFM | ADMIN | ~200ms |
 | `POST /session/train` | Huấn luyện Session-based model | ADMIN | ~20ms |
 | `POST /session/recommend` | Gợi ý theo phiên (co-occurrence + sequence) | Public | ~80ms |
-| `POST /cf/train` | Huấn luyện 4 CF models (Item-Item, User-User, ALS, Hybrid) | ADMIN | ~2,000ms |
-| `POST /cf/explain` | Giải thích gợi ý CF cho user — auto-train trước | ADMIN | ~5,500ms |
-| `POST /evaluate` | Đánh giá mô hình (Precision, Recall, F1, NDCG, Coverage) | ADMIN | ~4,000ms |
-| `POST /abtest/log` | Ghi nhận tương tác A/B test | Protected | ~10ms |
-| `POST /abtest/compare` | So sánh hiệu quả 2 nhóm | ADMIN | ~10ms |
-| `GET /abtest/report` | Báo cáo A/B test tổng hợp | ADMIN | ~6ms |
-| `POST /abtest/reset` | Reset dữ liệu A/B test | ADMIN | ~5ms |
 
 ### Thuật toán
 
 | Model | Kỹ thuật |
 |-------|----------|
-| **Session-based** | Co-occurrence Matrix + Sequence Prediction (Markov chain) |
-| **Item-Item CF** | Cosine similarity trên user-product matrix |
-| **User-User CF** | User similarity → weighted rating prediction |
-| **ALS** | Alternating Least Squares matrix factorization |
-| **Hybrid** | Weighted combination of all CF methods (item=0.3, user=0.3, als=0.4) |
+| **Session-based** | Co-occurrence Matrix + Sequence Prediction (Markov chain) + HSP/RIC |
 | **Clustering** | RFM Analysis (Recency, Frequency, Monetary) + K-Means |
-| **A/B Testing** | Chi-squared test, conversion rate comparison |
 
 ### Kết quả test gần nhất
 
 ```
 ═══════════════════════════════════════════════════════
-📊 KẾT QUẢ TEST ML — 13/13 passed (100%) 🎉
+📊 KẾT QUẢ TEST ML — 6/6 passed (100%) 🎉
 ═══════════════════════════════════════════════════════
   ✅ ML Health                        (2ms)
   ✅ ML Engine Info                   (2ms)
   ✅ Train Session (282 views)        (22ms)
-  ✅ Train CF (98 orders, 101 products, 4 models) (2045ms)
-  ✅ Evaluate Models (Precision, Recall, F1, NDCG, Coverage) (4154ms)
   ✅ Run Clustering (4 clusters, 15 users) (203ms)
   ✅ Trending Products (4 sản phẩm)   (2ms)
   ✅ Session Recommend (5 gợi ý)      (83ms)
-  ✅ Explain Recommendations (5 recs, weights: item_cf, user_cf, als) (5533ms)
-  ✅ A/B Test Log                     (16ms)
-  ✅ A/B Test Log 2                   (15ms)
-  ✅ A/B Test Compare                 (9ms)
-  ✅ A/B Test Report                  (6ms)
 ═══════════════════════════════════════════════════════
-  ✅ Passed: 13/13 (100%)
-  ⏱  Tổng: 18,966ms
+  ✅ Passed: 6/6 (100%)
 ═══════════════════════════════════════════════════════
 ```
 
@@ -432,11 +406,11 @@ KHOALUAN/
 │   │   │   ├── recommendationController.js # Gợi ý (personalized, trending, similar)
 │   │   │   ├── notificationController.js # Thông báo
 │   │   │   ├── settingsController.js     # Cài đặt hệ thống
-│   │   │   ├── mlController.js           # ML: Session, CF, Evaluate, A/B Test
+│   │   │   ├── mlController.js           # ML: Session, Health
 │   │   │   └── auditController.js        # Audit log
 │   │   ├── routes/
 │   │   │   ├── index.js                  # Route aggregator
-│   │   │   ├── ml.js                     # ML endpoints (session, cf, evaluate, abtest)
+│   │   │   ├── ml.js                     # ML endpoints (session, health)
 │   │   │   └── ... (auth, products, orders, cart, categories...)
 │   │   ├── middleware/
 │   │   │   ├── auth.js                   # JWT protect + restrictTo
@@ -454,7 +428,7 @@ KHOALUAN/
 │   │   ├── seed-full.js                  # Dữ liệu mở rộng (8 partners, 101 products)
 │   │   ├── seed-new-models.js            # Banners, flash sales, refunds, violations...
 │   │   ├── seed-ml-test.js               # 281 product views, orders cho ML
-│   │   └── test-ml-all.js                # Auto-test 13 ML endpoints
+│   │   └── test-ml-all.js                # Auto-test 10 ML endpoints
 │   └── ml/                               # ML Service (Python)
 │       ├── Dockerfile.ml
 │       ├── requirements.txt
@@ -468,13 +442,9 @@ KHOALUAN/
 │       │   ├── api.py                    # FastAPI endpoints (tất cả ML routes + RAG endpoints)
 │       │   ├── clustering_service.py     # K-Means + RFM
 │       │   └── __init__.py
-│       ├── collaborative/
-│       │   └── collaborative_filtering.py # Item-Item, User-User, ALS, Hybrid
 │       ├── session/
 │       │   ├── session_recommender.py     # Co-occurrence + Sequence Prediction
 │       │   └── __init__.py
-│       └── evaluation/
-│           └── metrics.py                # Precision, Recall, F1, NDCG, A/B Test
 │
 ├── frontend/                             # Frontend Web (React + Vite + Tailwind)
 │   ├── Dockerfile
@@ -500,7 +470,7 @@ KHOALUAN/
 │       │   ├── Layout/ (Navbar, Footer, MainLayout, AdminLayout, PartnerLayout)
 │       │   └── common/ (ProductCard, LoadingSpinner, BannerSlider, Pagination)
 │       └── pages/
-│           ├── admin/ (17 trang: Dashboard, ML Test, Clusters, Recommendations, ABTest...)
+│           ├── admin/ (15 trang: Dashboard, ML Test, Clusters...)
 │           ├── partner/ (7 trang: Dashboard, Products, Orders...)
 │           ├── auth/ (LoginPage, RegisterPage)
 │           └── ... (Home, Products, Cart, Checkout, Orders...)
@@ -565,22 +535,7 @@ KHOALUAN/
 |--------|----------|-------|:----:|
 | POST | `/ml/session/recommend` | Gợi ý theo phiên (auto-train) | Public |
 | POST | `/ml/session/train` | Huấn luyện Session model | ADMIN |
-| POST | `/ml/cf/train` | Huấn luyện CF models | ADMIN |
-| POST | `/ml/graphcf/train` | Huấn luyện Graph CF nhẹ (Li & Zhang 2025) | ADMIN |
-| POST | `/ml/graphcf/recommend` | Gợi ý bằng Graph CF (auto-train) | ADMIN |
-| POST | `/ml/lightgcncf/train` | Huấn luyện LightGCN-CF (PyTorch, BPR) | ADMIN |
-| POST | `/ml/lightgcncf/recommend` | Gợi ý bằng LightGCN-CF (auto-train) | ADMIN |
-| POST | `/ml/explain` | Giải thích gợi ý (auto-train CF) | ADMIN |
-| POST | `/ml/evaluate` | Đánh giá mô hình offline | ADMIN |
 | GET | `/ml/health` | ML Service health | Public |
-
-### ML — A/B Testing
-| Method | Endpoint | Mô tả | Auth |
-|--------|----------|-------|:----:|
-| POST | `/ml/abtest/log` | Ghi nhận tương tác | Protected |
-| POST | `/ml/abtest/compare` | So sánh 2 nhóm | ADMIN |
-| GET | `/ml/abtest/report` | Báo cáo tổng hợp | ADMIN |
-| POST | `/ml/abtest/reset` | Reset dữ liệu | ADMIN |
 
 ### Clusters
 | Method | Endpoint | Mô tả | Auth |
@@ -713,9 +668,7 @@ Recommendation → User?, Cluster?, Product (score, reason)
 
 | Trang admin | Ngôn ngữ |
 |-------------|:--------:|
-| Gợi ý sản phẩm | 🇻🇳 Tiếng Việt |
 | Phân cụm khách hàng | 🇻🇳 Tiếng Việt |
-| Thử nghiệm A/B | 🇻🇳 Tiếng Việt |
 | Kiểm tra ML tự động | 🇻🇳 Tiếng Việt |
 
 ---
@@ -729,11 +682,9 @@ Recommendation → User?, Cluster?, Product (score, reason)
 5. **Inline Email Registration** — Nhập email → check tồn tại → đăng nhập hoặc hiện form đăng ký ngay trên trang login
 6. **JWT 15 phút** — Access token hết hạn sau 15 phút, tự động refresh, bảo mật cao hơn
 7. **Session-based Recommendation** — Co-occurrence + Sequence Prediction (281 views)
-8. **Collaborative Filtering** — 4 models: Item-Item, User-User, ALS, Hybrid
-9. **Auto-Train ML** — Tự động train session/CF model trước khi recommend
-10. **A/B Testing** — So sánh Control vs Treatment, log nhanh, batch, báo cáo realtime
-11. **ML Test Suite** — Tự động kiểm tra 13 ML endpoints, báo cáo chi tiết
-12. **Phân cụm khách hàng** — K-Means + RFM qua ML Service riêng
+8. **Auto-Train ML** — Tự động train session model trước khi recommend
+9. **ML Test Suite** — Tự động kiểm tra 6 ML endpoints, báo cáo chi tiết
+10. **Phân cụm khách hàng** — K-Means + RFM qua ML Service riêng
 13. **Gợi ý cá nhân hóa** — Dựa trên nhóm khách hàng + lịch sử mua hàng
 14. **Flash Sale** — Sự kiện giảm giá có thời gian, quản lý số lượng
 15. **Mã giảm giá** — 22 mã PERCENTAGE/FIXED, có hạn, theo người dùng
@@ -752,7 +703,7 @@ Recommendation → User?, Cluster?, Product (score, reason)
 28. **Lazy Image Loading** — IntersectionObserver + blur-up transition, skeleton placeholder
 29. **Code Splitting** — React.lazy() cho 25+ admin/partner routes, Suspense fallback
 30. **Chunk Optimization** — Tách recharts/react-icons thành chunk riêng, tăng cache hit
-31. **Vietsub toàn bộ Admin AI** — ML, A/B Test, Clusters tiếng Việt
+31. **Vietsub toàn bộ Admin AI** — ML, Clusters tiếng Việt
 32. **Kho voucher cho user** — Trang /coupons với tab Tất cả/Đã lưu, lọc theo loại, copy mã, đếm ngược hết hạn, skeleton loading
 33. **Avatar upload** — Chọn ảnh → FileReader base64 → dispatch updateProfile, validate file type & size, spinner loading
 34. **Order stats realtime** — Tổng đơn, hoàn thành, đã huỷ từ API, dùng pagination.total chính xác

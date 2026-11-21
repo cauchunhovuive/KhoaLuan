@@ -7,14 +7,9 @@
  * 1. Login → lấy token
  * 2. GET /api/ml/health
  * 3. POST /api/ml/session/train
- * 4. POST /api/ml/cf/train
- * 5. POST /api/ml/evaluate
- * 6. POST /api/clusters/run
- * 7. GET /api/recommendations/trending
- * 8. POST /api/ml/abtest/log (sample)
- * 9. POST /api/ml/abtest/compare
- * 10. GET /api/ml/abtest/report
- * 11. GET /api/ml/health (verify still healthy)
+ * 4. POST /api/clusters/run
+ * 5. GET /api/recommendations/trending
+ * 6. POST /api/ml/session/recommend
  */
 
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
@@ -62,11 +57,6 @@ async function test(name, fn, expectedSuccess = true) {
   }
 }
 
-async function getUserId(email) {
-  const user = await prisma.user.findUnique({ where: { email } });
-  return user?.id;
-}
-
 async function getProductIds(limit = 3) {
   const products = await prisma.product.findMany({ where: { isActive: true }, take: limit });
   return products.map(p => p.id);
@@ -106,91 +96,26 @@ async function main() {
     return { success: false, message: r.data?.data?.message };
   });
 
-  // 5. Train CF
-  await test('Train Collaborative Filtering', async () => {
-    const r = await api('POST', '/api/ml/cf/train');
-    if (r.data.success && r.data.data?.trained) {
-      return { success: true, n_orders: r.data.data.n_orders, n_products: r.data.data.n_products, models: r.data.data.models };
-    }
-    return { success: false, message: r.data?.data?.message };
-  });
-
-  // 6. Evaluate
-  await test('Evaluate Models', async () => {
-    const r = await api('POST', '/api/ml/evaluate', { topN: 10 });
-    if (r.data.success && r.data.data?.metrics) {
-      return { success: true, metrics: Object.keys(r.data.data.metrics).join(', ') };
-    }
-    return { success: false, message: 'No metrics returned' };
-  });
-
-  // 7. Clustering
+  // 4. Clustering
   await test('Run Clustering', async () => {
     const r = await api('POST', '/api/clusters/run');
     return { success: r.data.success, clusters: r.data.data?.clusters?.length || 0 };
   });
 
-  // 8. Trending
+  // 5. Trending
   await test('Trending Products', async () => {
     const r = await api('GET', '/api/recommendations/trending');
     const count = (r.data?.data || []).length;
     return { success: count > 0, count };
   });
 
-  // 9. Session Recommend (with real product IDs)
+  // 6. Session Recommend (with real product IDs)
   await test('Session Recommend', async () => {
     const productIds = await getProductIds(2);
     if (productIds.length < 2) return { success: false, message: 'Not enough products' };
     const r = await api('POST', '/api/ml/session/recommend', { sessionItems: productIds, topN: 5 });
     const recs = r.data?.data || [];
     return { success: true, recommendations: recs.length, products: recs.map(p => p.name).join(', ').substring(0, 100) };
-  });
-
-  // 10. Explain (with admin user)
-  await test('Explain Recommendations', async () => {
-    const adminId = await getUserId('admin@khoaluan.com');
-    const r = await api('POST', '/api/ml/explain', { userId: adminId, topN: 5 });
-    const recs = r.data?.data?.recommendations || [];
-    const weights = r.data?.data?.weights || {};
-    return { success: true, n_recs: recs.length, weights: Object.keys(weights).join(', ') };
-  });
-
-  // 11. A/B Test: Log sample interaction
-  await test('A/B Test Log', async () => {
-    const customerIds = await prisma.user.findMany({ where: { role: 'CUSTOMER' }, take: 2 });
-    const productIds = await getProductIds(2);
-    if (customerIds.length < 1 || productIds.length < 1) return { success: false, message: 'Not enough data' };
-    
-    const r1 = await api('POST', '/api/ml/abtest/log', {
-      group: 'control', userId: customerIds[0].id, productId: productIds[0], action: 'impression', revenue: 0
-    });
-    return { success: r1.data.success, group: 'control', action: 'impression' };
-  });
-
-  // 12. A/B Test: Log second interaction
-  await test('A/B Test Log 2', async () => {
-    const customerIds = await prisma.user.findMany({ where: { role: 'CUSTOMER' }, take: 2 });
-    const productIds = await getProductIds(2);
-    if (customerIds.length < 2 || productIds.length < 2) return { success: false, message: 'Not enough data' };
-    
-    const r2 = await api('POST', '/api/ml/abtest/log', {
-      group: 'treatment', userId: customerIds[1].id, productId: productIds[1], action: 'click', revenue: 0
-    });
-    return { success: r2.data.success, group: 'treatment', action: 'click' };
-  });
-
-  // 13. A/B Test: Compare
-  await test('A/B Test Compare', async () => {
-    const r = await api('POST', '/api/ml/abtest/compare', { groupA: 'control', groupB: 'treatment' });
-    return { success: r.data.success, winner: r.data.data?.winner || 'tie' };
-  });
-
-  // 14. A/B Test: Report
-  await test('A/B Test Report', async () => {
-    const r = await api('GET', '/api/ml/abtest/report');
-    const control = r.data?.data?.control?.total_events || 0;
-    const treatment = r.data?.data?.treatment?.total_events || 0;
-    return { success: r.data.success, control_events: control, treatment_events: treatment };
   });
 
   // === FINAL SUMMARY ===

@@ -222,13 +222,33 @@ const logProductView = asyncHandler(async (req, res) => {
   const product = await prisma.product.findUnique({ where: { id }, select: { id: true } });
   if (!product) throw new AppError('Sản phẩm không tồn tại', 404);
 
-  // Log view (userId is optional - public users can view too)
-  await prisma.productView.create({
-    data: {
-      userId: req.user?.id || 'anonymous',
-      productId: id,
-    },
-  });
+  // Log view (userId is optional - public users can view too).
+  // Khách vãng lai dùng guestId riêng từng trình duyệt (frontend gửi lên) để
+  // thuật toán chia phiên đúng người — nếu gộp chung 'anonymous' thì hành vi
+  // của mọi khách bị trộn thành 1 người → P1/P2 học sai.
+  const { guestId } = req.body || {};
+  const viewerId = req.user?.id || (guestId ? String(guestId).slice(0, 64) : null);
+  if (viewerId) {
+    // Server-side dedupe: chặn double-log chìm (React StrictMode dev fire 2 lần,
+    // retry của axios...). 2 view cùng người + cùng SP trong vòng 2s = 1 lượt.
+    // Nếu không lọc, P1/P2 học cặp (X,X) — noisy làm gợi ý sai.
+    const recentDup = await prisma.productView.findFirst({
+      where: {
+        userId: viewerId,
+        productId: id,
+        createdAt: { gte: new Date(Date.now() - 2_000) },
+      },
+      select: { id: true },
+    });
+    if (!recentDup) {
+      await prisma.productView.create({
+        data: {
+          userId: viewerId,
+          productId: id,
+        },
+      });
+    }
+  }
 
   res.json({ success: true });
 });

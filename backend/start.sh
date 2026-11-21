@@ -22,8 +22,10 @@ done
 echo "  ✔ Database sẵn sàng"
 
 # Push schema lên database
+# KHÔNG dùng --accept-data-loss: nếu schema lệch, Prisma sẽ tự ý xoá cột/dữ liệu.
+# Schema khớp thì push bình thường; lệch thì báo lỗi thay vì mất dữ liệu.
 echo "[2/5] Push schema..."
-npx prisma db push --accept-data-loss 2>&1 | grep -v "already exists"
+npx prisma db push 2>&1 | grep -v "already exists" || true
 
 # Seed dữ liệu mẫu
 echo "[3/5] Seed dữ liệu mẫu..."

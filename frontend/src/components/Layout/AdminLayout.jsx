@@ -3,9 +3,9 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   FiHome, FiPackage, FiGrid, FiUsers,
-  FiPieChart, FiTrendingUp, FiSettings, FiLogOut,
+  FiPieChart, FiSettings, FiLogOut,
   FiMenu, FiChevronLeft, FiBell, FiCheck, FiClock,
-  FiUserCheck, FiTag, FiImage, FiZap, FiRefreshCw, FiAlertTriangle, FiFileText, FiBarChart2, FiActivity, FiBookOpen,
+  FiUserCheck, FiTag, FiImage, FiZap, FiRefreshCw, FiAlertTriangle, FiFileText, FiActivity,
 } from 'react-icons/fi';
 import { logout } from '../../store/authSlice';
 import { fetchNotifications, markAsRead, markAllAsRead } from '../../store/notificationSlice';
@@ -23,10 +23,7 @@ const sidebarItems = [
   { icon: FiAlertTriangle, label: 'Vi phạm', path: '/admin/violations' },
   { icon: FiFileText, label: 'Audit Log', path: '/admin/audit' },
   { icon: FiPieChart, label: 'Phân cụm', path: '/admin/clusters' },
-  { icon: FiTrendingUp, label: 'Gợi ý', path: '/admin/recommendations' },
-  { icon: FiBarChart2, label: 'A/B Test', path: '/admin/abtest' },
   { icon: FiActivity, label: 'Kiểm tra ML', path: '/admin/ml-test' },
-  { icon: FiBookOpen, label: 'Demo bài báo', path: '/admin/paper-demo' },
   { icon: FiSettings, label: 'Cài đặt', path: '/admin/settings' },
 ];
 

@@ -176,9 +176,9 @@ async function main() {
   console.log(`   🎬 Phiên vừa tạo: ~${TARGET_SESSIONS} (90% theo mẫu hành vi, 10% nhiễu)`);
   console.log('='.repeat(55));
   console.log('\n➜ Bước tiếp theo:');
-  console.log('   1. Vào /admin/recommendations → bấm "Huấn luyện Session"');
-  console.log('   2. Hoặc vào /admin/paper-demo → chọn sản phẩm thật → "Chạy gợi ý"');
-  console.log('      (model tự train từ view logs mới)\n');
+  console.log('   1. Vào /admin/ml-test → bấm "Train Session"');
+  console.log('   2. Mở trang chi tiết sản phẩm ở storefront → section "Có thể bạn cũng thích"');
+  console.log('      chạy HSP thật (model tự train từ view logs mới)\n');
 }
 
 main()

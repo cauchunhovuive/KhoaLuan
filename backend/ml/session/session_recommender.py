@@ -4,13 +4,16 @@ Session-Based Recommendation Engine
 Gợi ý sản phẩm dựa trên hành vi trong phiên hiện tại:
 1. Co-occurrence Matrix: Sản phẩm nào thường được xem/mua cùng nhau trong 1 phiên
 2. Sequence-based: Dựa trên thứ tự sản phẩm được xem trong phiên
-3. Popularity-based: Sản phẩm phổ biến trong phiên hiện tại
+3. HSP (Hierarchical Sequence Probability): P0/P1/P2 theo quan hệ Next
+4. RIC (Recurrent Item Co-occurrence): gamma + bộ nhớ hồi quy theo quan hệ InSameSession
+5. Popularity-based: Sản phẩm phổ biến trong phiên hiện tại
 """
 
 from typing import Dict, List, Optional, Tuple, Any
 from collections import defaultdict, Counter
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from datetime import datetime, timedelta
 
 logging.basicConfig(level=logging.INFO)
@@ -24,6 +27,10 @@ class SessionConfig:
     max_session_items: int = 50         # Số items tối đa trong 1 phiên
     cooc_top_k: int = 20                # Số neighbors cho co-occurrence
     min_cooc_count: int = 2             # Ngưỡng co-occurrence tối thiểu
+    min_support: int = 2                # Min-support lọc nhiễu: cặp/triplet xuất hiện
+                                        # < min_support lần bị coi là nhiễu và bỏ qua
+                                        # (gamma/count 1/1 là nhiễu thuần khi data thưa)
+    min_session_items: int = 2          # Số item tối thiểu để 1 phiên dùng học quan hệ
     decay_factor: float = 0.8           # Hệ số giảm dần theo thời gian
     top_n: int = 10                     # Số gợi ý mặc định
 
@@ -346,10 +353,14 @@ class HSPRecommender:
     - P2(A,B,C) — triplet sequence probability: P(item_t = C | item_{t-2} = A, item_{t-1} = B).
 
     Quy tắc gợi ý theo hierarchy (bài báo Figure 2):
-    - Bước 1 (t=1): recommend theo P0 (cold start).
-    - Bước 2 (t=2): recommend theo P1(item_1, B), bổ sung P0 nếu chưa đủ.
-    - Bước >=3 (t>=3): recommend theo P2(item_{t-2}, item_{t-1}, C),
+    - Bước t=1 (phiên rỗng, CHƯA xem item nào): recommend theo P0 (cold start).
+    - Bước t=2 (đã xem 1 item = item_1): recommend theo P1(item_1, B),
+      bổ sung P0 nếu chưa đủ.
+    - Bước t>=3 (đã xem >=2 item): recommend theo P2(item_{t-2}, item_{t-1}, C),
       bổ sung P1(item_{t-1}, B), rồi mới bổ sung P0. Không trùng lặp item.
+    
+    Lưu ý: t = số item đã xem + 1 (bước TIẾP THEO). Với phiên đã xem n item:
+    n=0 -> P0, n=1 -> P1(last), n>=2 -> P2(two last) -> P1(last) -> P0.
     """
 
     def __init__(self, config: Optional[SessionConfig] = None):
@@ -390,15 +401,24 @@ class HSPRecommender:
         denom = self.total_appearances or 1
         self.p0 = {pid: c / denom for pid, c in self.item_counts.items()}
 
-        # P1(A,B) = count(A,B consecutive) / count(A)
+        # Min-support: lọc quan hệ xuất hiện quá ít lần (nhiễu thuần khi data thưa)
+        min_sup = max(1, getattr(self.config, 'min_support', 1))
+
+        # P1(A,B) = count(A,B consecutive) / count(A) — chỉ giữ cặp có count >= min_support
         for a, transitions in self.pair_counts.items():
             denom_a = self.item_counts.get(a, 0) or 1
-            self.p1[a] = {b: c / denom_a for b, c in transitions.items()}
+            self.p1[a] = {
+                b: c / denom_a for b, c in transitions.items()
+                if c >= min_sup
+            }
 
-        # P2(A,B,C) = count(A,B,C consecutive) / count(A,B consecutive)
+        # P2(A,B,C) = count(A,B,C consecutive) / count(A,B consecutive) — lọc tương tự
         for (a, b), candidates in self.triplet_counts.items():
             denom_ab = self.pair_counts.get(a, {}).get(b, 0) or 1
-            self.p2[(a, b)] = {c: cnt / denom_ab for c, cnt in candidates.items()}
+            self.p2[(a, b)] = {
+                c: cnt / denom_ab for c, cnt in candidates.items()
+                if cnt >= min_sup and denom_ab > 0
+            }
 
         self.is_fitted = True
         logger.info(
@@ -415,24 +435,32 @@ class HSPRecommender:
         session_items: List[str],
         top_n: Optional[int] = None,
         exclude_ids: Optional[List[str]] = None,
+        exclude_session_items: bool = False,
     ) -> List[Dict]:
         """
-        Gợi ý item kế tiếp theo hierarchy: triplet (P2) -> pair (P1) -> single (P0).
+        Gợi ý item kế tiếp theo hierarchy đúng bài báo (t = số item đã xem + 1):
+        - đã xem >=2 item (t>=3): P2(hai item cuối) -> P1(item cuối) -> P0
+        - đã xem 1 item   (t=2) : P1(item cuối) -> P0
+        - chưa xem gì     (t=1) : P0 (cold-start)
 
         Args:
-            session_items: Chuỗi item trong phiên hiện tại (đã xem)
+            session_items: Chuỗi item trong phiên hiện tại (đã xem), theo thứ tự thời gian
             top_n: Số lượng gợi ý
             exclude_ids: Các item cần loại trừ
+            exclude_session_items: True = loại MỌI item đã xem khỏi kết quả (UI production);
+                   False = đúng bài báo (item đã xem vẫn có thể xuất hiện — dùng cho
+                   benchmark, target có thể là lượt xem lại)
 
         Returns:
             Danh sách gợi ý
         """
-        if not self.is_fitted or not session_items:
+        if not self.is_fitted:
             return []
 
         top_n = top_n or self.config.top_n
         exclude_set = set(exclude_ids or [])
-        exclude_set.update(session_items)  # Không gợi ý lại item đã xem trong phiên
+        if exclude_session_items:
+            exclude_set.update(session_items)  # Không gợi ý lại item đã xem trong phiên
         results: List[Dict] = []
         included = set(exclude_set)
 
@@ -453,16 +481,16 @@ class HSPRecommender:
 
         n = len(session_items)
 
-        # Bước t >= 3: dùng triplet sequence probability P2
-        if n >= 3:
+        # Đã xem >=2 item (bước t = n+1 >= 3): dùng triplet sequence probability P2
+        if n >= 2:
             key = (session_items[-2], session_items[-1])
             for c, prob in sorted(self.p2.get(key, {}).items(), key=lambda x: x[1], reverse=True):
                 _append(c, prob, 'P2')
                 if len(results) >= top_n:
                     break
 
-        # Bước t >= 2: dùng pair sequence probability P1 (item gần nhất)
-        if len(results) < top_n and n >= 2:
+        # Đã xem >=1 item (bước t = n+1 >= 2): dùng pair sequence probability P1
+        if len(results) < top_n and n >= 1:
             last = session_items[-1]
             for b, prob in sorted(self.p1.get(last, {}).items(), key=lambda x: x[1], reverse=True):
                 _append(b, prob, 'P1')
@@ -470,6 +498,7 @@ class HSPRecommender:
                     break
 
         # Bổ sung 0-history predictions (P0) nếu vẫn chưa đủ
+        # (và là nhánh chính khi t=1 — phiên rỗng, cold-start)
         if len(results) < top_n:
             for pid in self._sorted_p0():
                 _append(pid, self.p0.get(pid, 0.0), 'P0')
@@ -508,12 +537,14 @@ class RICRecommender:
         self.p0: Dict[str, float] = {}
         self.is_fitted = False
 
-    def fit_from_sessions(self, sessions: List[Dict]):
+    def fit_from_sessions(self, sessions: List[Dict], p0: Optional[Dict[str, float]] = None):
         """
         Học co-occurrence counts và cold-start probabilities.
 
         Args:
             sessions: Danh sách phiên [{session_id, items: [product_id, ...], created_at}]
+            p0: P0 dùng chung với HSP (đúng spec "dùng lại xác suất cold-start ở P0
+                của HSP"). Nếu None, tự tính P0 theo số session chứa item.
         """
         logger.info(f"Fitting RIC model from {len(sessions)} sessions")
 
@@ -531,8 +562,32 @@ class RICRecommender:
                     self.cooc_counts[a][b] += 1
                     self.cooc_counts[b][a] += 1
 
-        total = sum(self.item_session_counts.values()) or 1
-        self.p0 = {pid: c / total for pid, c in self.item_session_counts.items()}
+        # Min-support: bỏ cặp co-occurrence xuất hiện < min_support phiên
+        # (gamma = 1/1 là nhiễu thuần — gợi ý dựa trên nó sẽ "ngớ ngẩn")
+        min_sup = max(1, getattr(self.config, 'min_support', 1))
+        if min_sup > 1:
+            dropped = 0
+            for a in list(self.cooc_counts.keys()):
+                filtered = {b: c for b, c in self.cooc_counts[a].items() if c >= min_sup}
+                dropped += len(self.cooc_counts[a]) - len(filtered)
+                if filtered:
+                    self.cooc_counts[a] = defaultdict(int, filtered)
+                else:
+                    del self.cooc_counts[a]
+            logger.info(f"RIC min_support={min_sup}: bỏ {dropped} cặp co-occurrence nhiễu")
+
+        if p0 is not None:
+            # Dùng lại P0 của HSP (xác suất xuất hiện theo lượt) + item chỉ có
+            # trong RIC (hiếm) lấy theo số session chứa
+            merged = dict(p0)
+            total = sum(self.item_session_counts.values()) or 1
+            for pid in self.item_session_counts:
+                if pid not in merged:
+                    merged[pid] = self.item_session_counts[pid] / total
+            self.p0 = merged
+        else:
+            total = sum(self.item_session_counts.values()) or 1
+            self.p0 = {pid: c / total for pid, c in self.item_session_counts.items()}
         self.is_fitted = True
 
         logger.info(
@@ -541,7 +596,14 @@ class RICRecommender:
         )
 
     def _confidence(self, x: str, oi: str) -> float:
-        """gamma(o_i | x) = cooc(x, o_i) / sessions(x)"""
+        """
+        gamma(o_i | x) = cooc(x, o_i) / sessions(x)
+        Trường hợp đặc biệt oi == x: gamma(x | x) = 1 theo định nghĩa
+        (mọi session chứa x đều chứa x) — vì vậy plain RIC luôn đẩy
+        item hiện tại lên đầu danh sách.
+        """
+        if x == oi:
+            return 1.0
         denom = self.item_session_counts.get(x, 0)
         if denom == 0:
             return 0.0
@@ -552,23 +614,26 @@ class RICRecommender:
         session_items: List[str],
         top_n: Optional[int] = None,
         exclude_ids: Optional[List[str]] = None,
-        alpha: float = 0.5,
-        current_item_last: bool = True,
+        alpha: float = 0.3,
+        current_item_last: bool = False,
+        exclude_session_items: bool = False,
     ) -> List[Dict]:
-        """
-        Gợi ý item kế tiếp bằng mô hình hồi quy co-occurrence.
-
-        Args:
-            session_items: Chuỗi item trong phiên hiện tại
+        """        Gợi ý item kế tiếp bằng mô hình hồi quy co-occurrence.
+        Args:
+            session_items: Chuỗi item trong phiên hiện tại (theo thứ tự thời gian)
             top_n: Số lượng gợi ý
             exclude_ids: Các item cần loại trừ
             alpha: forgetting factor — trọng số của item đã xem trước đó
-                   (bài báo test 0.1–0.9, xem Table 3)
-            current_item_last: nếu True (RIC-CiL), đảm bảo item hiện tại
-                   không xuất hiện trong top-N. Nếu False (plain RIC), cho
-                   phép item hiện tại xuất hiện như trong bài báo.
-
-        Returns:
+                   (bài báo test 0.1–0.9; tuning chọn 0.3 — cân bằng nhất
+                   trên cả Yoochoose lẫn Diginetica)
+            current_item_last: nếu True (RIC-CiL), đẩy item hiện tại xuống cuối
+                   danh sách (không hiển thị lại sản phẩm khách đang xem).
+                   Nếu False (plain RIC), cho phép item hiện tại xuất hiện
+                   như trong bài báo (γ(x|x)=1 → item hiện tại ở top).
+            exclude_session_items: nếu True (UI production), loại MỌI item đã xem
+                   trong phiên khỏi kết quả. Benchmark dùng False để đo
+                   MRR/Recall công bằng (target có thể là lượt xem lại).
+        Returns:
             Danh sách gợi ý
         """
         if not self.is_fitted or not session_items:
@@ -576,12 +641,21 @@ class RICRecommender:
 
         top_n = top_n or self.config.top_n
         exclude_set = set(exclude_ids or [])
+        # exclude_session_items=True (UI production): loại MỌI item đã xem khỏi
+        # KẾT QUẢ — kể cả khi P0 backfill bổ sung thêm item để đủ top_n.
+        if exclude_session_items:
+            exclude_set.update(session_items)
         current_item = session_items[-1] if session_items else None
 
         # Candidate set: các item co-occurrence với ít nhất 1 item trong phiên
         candidate_pids = set()
         for item in session_items:
             candidate_pids.update(self.cooc_counts.get(item, {}).keys())
+        # γ(x|x)=1 nên item hiện tại luôn là candidate và đứng đầu (plain RIC)
+        if current_item:
+            candidate_pids.add(current_item)
+        if exclude_session_items:
+            candidate_pids.difference_update(session_items)
 
         # Khởi tạo w_i(0) = P0(o_i) cho tất cả item (implicit).
         # Chỉ track trọng số của candidate items.
@@ -600,7 +674,6 @@ class RICRecommender:
         ranked = sorted(weights.items(), key=lambda x: x[1], reverse=True)
         results: List[Dict] = []
         included = set(exclude_set)
-        included.update(session_items)
 
         for pid, w in ranked:
             if pid in included:
@@ -625,13 +698,13 @@ class RICRecommender:
                     'reason': 'Gợi ý cold-start theo độ phổ biến',
                 })
                 if len(results) >= top_n:
-                    break
-
-        # RIC-CiL: đảm bảo item hiện tại không nằm trong top-N.
-        # (Session items đã bị loại khỏi kết quả ở trên nên filter này chỉ
-        #  phòng trường hợp item hiện tại nằm trong candidate set.)
+                    break        # RIC-CiL: đẩy item hiện tại xuống CUỐI danh sách (spec: "luôn đẩy item
+        # hiện tại xuống cuối danh sách") — cắt và nối lại thay vì loại bỏ.
+        # Plain RIC (current_item_last=False): giữ nguyên vị trí theo w_i.
         if current_item_last and current_item:
-            results = [r for r in results if r['product_id'] != current_item]
+            rest = [r for r in results if r['product_id'] != current_item]
+            cur = [r for r in results if r['product_id'] == current_item]
+            results = rest + cur
 
         return results[:top_n]
 
@@ -653,14 +726,21 @@ class SessionRecommender:
     def __init__(
         self,
         config: Optional[SessionConfig] = None,
-        alpha: float = 0.5,
+        alpha: float = 0.3,
     ):
         self.config = config or SessionConfig()
         self.alpha = float(alpha)  # forgetting factor mặc định cho RIC
+        # 0.3 = lựa chọn cân bằng nhất trên cả 2 dataset benchmark:
+        # Yoochoose MRR@10=0.2159/Rec@20=0.6485 (ngang 0.1),
+        # Diginetica MRR@10=0.1236/Rec@10=0.2645 (tốt nhất)
         self.cooccurrence = CoOccurrenceMatrix(config)
         self.sequence = SequenceBasedRecommender(config)
         self.hsp = HSPRecommender(config)
         self.ric = RICRecommender(config)
+        # Metadata phục vụ auto-retrain: model biết mình train từ bao nhiêu phiên
+        # và lúc nào — để service quyết định fit lại khi data mới tốt hơn model.
+        self.sessions_used = 0
+        self.trained_at = None
 
     def fit(self, sessions: List[Dict]):
         """
@@ -670,10 +750,13 @@ class SessionRecommender:
             sessions: Danh sách phiên [{session_id, items, created_at}]
         """
         logger.info("Fitting Session Recommender...")
+        self.sessions_used = len(sessions)
+        self.trained_at = datetime.now(timezone.utc)
         self.cooccurrence.fit_from_sessions(sessions)
         self.sequence.fit_from_sessions(sessions)
         self.hsp.fit_from_sessions(sessions)
-        self.ric.fit_from_sessions(sessions)
+        # RIC dùng lại P0 của HSP (đúng spec: cold-start probability chung cho cả 2 thuật toán)
+        self.ric.fit_from_sessions(sessions, p0=self.hsp.p0)
         logger.info("Session Recommender training completed")
 
     def recommend(
@@ -683,6 +766,7 @@ class SessionRecommender:
         exclude_ids: Optional[List[str]] = None,
         strategy: str = 'hybrid',
         alpha: Optional[float] = None,
+        exclude_session_items: bool = False,
     ) -> List[Dict]:
         """
         Gợi ý sản phẩm cho phiên hiện tại.
@@ -694,14 +778,21 @@ class SessionRecommender:
             strategy: 'hybrid', 'cooccurrence', 'sequence', 'hsp', 'ric', 'ric_cil', hoặc 'popularity'
             alpha: forgetting factor cho RIC (chỉ dùng khi strategy là ric/ric_cil;
                    mặc định lấy từ constructor)
+            exclude_session_items: True = không gợi ý lại item đã xem trong phiên
+                   (cho UI production); False = đúng bài báo (item đã xem vẫn có thể
+                   xuất hiện — benchmark dùng False để đo MRR/Recall công bằng)
         
         Returns:
             Danh sách gợi ý
         """
-        if not session_items:
-            return self._popular_fallback(top_n)
-        
         top_n = top_n or self.config.top_n
+        
+        if not session_items:
+            # t=1: phiên rỗng — cold-start theo P0 của HSP (đúng spec HSP),
+            # trừ khi caller yêu cầu loại item (không áp dụng khi chưa có item)
+            if strategy in ('hsp', 'ric', 'ric_cil'):
+                return self.hsp.recommend([], top_n, exclude_ids)
+            return self._popular_fallback(top_n)
         
         if strategy == 'cooccurrence':
             return self.cooccurrence.recommend_from_session(
@@ -712,17 +803,20 @@ class SessionRecommender:
                 session_items, top_n, exclude_ids
             )
         elif strategy == 'hsp':
-            return self.hsp.recommend(session_items, top_n, exclude_ids)
+            return self.hsp.recommend(
+                session_items, top_n, exclude_ids,
+                exclude_session_items=exclude_session_items,
+            )
         elif strategy in ('ric', 'ric_cil'):
-            # Lưu ý: session items luôn bị loại khỏi kết quả (theo convention dự án),
-            # nên 'ric' và 'ric_cil' cho kết quả tương đương nhau trong bản cài đặt này.
-            # Khác biệt so với bài báo: plain RIC (γ(x|x)=1) đặt item hiện tại ở top —
-            # ở đây item hiện tại bị loại bỏ như một lựa chọn thiết kế cho e-commerce.
+            # Plain RIC: item hiện tại có thể xuất hiện ở top (γ(x|x)=1, như bài báo).
+            # RIC-CiL: đẩy item hiện tại xuống cuối danh sách.
+            # exclude_session_items=True (production UI): loại mọi item đã xem.
             cil = (strategy == 'ric_cil')
             return self.ric.recommend(
                 session_items, top_n, exclude_ids,
                 alpha=alpha if alpha is not None else self.alpha,
                 current_item_last=cil,
+                exclude_session_items=exclude_session_items,
             )
         elif strategy == 'popularity':
             return self._popular_fallback(top_n)
@@ -835,6 +929,7 @@ def build_sessions_from_views(
         
         current_session_items = []
         session_start = None
+        last_ts = None
         
         for _, log in user_logs.iterrows():
             ts = log['timestamp']
@@ -843,9 +938,12 @@ def build_sessions_from_views(
             if session_start is None:
                 session_start = ts
                 current_session_items = [product_id]
-            elif (ts - session_start).total_seconds() / 60 > timeout_minutes:
-                # Lưu phiên cũ
-                if current_session_items:
+            elif (ts - last_ts).total_seconds() / 60 > timeout_minutes:
+                # Lưu phiên cũ — timeout đo theo GAP giữa 2 event liên tiếp
+                # (không hoạt động > 30 phút = sang phiên mới, chuẩn IAB/bài báo),
+                # KHÔNG phải từ đầu phiên.
+                if len(current_session_items) >= 2:
+                    # Bỏ session chỉ có 1 item (không đủ học quan hệ — spec bước 1)
                     sessions.append({
                         'session_id': f'session_{session_counter}',
                         'user_id': user_id,
@@ -859,9 +957,10 @@ def build_sessions_from_views(
                 current_session_items = [product_id]
             else:
                 current_session_items.append(product_id)
+            last_ts = ts
         
         # Lưu phiên cuối
-        if current_session_items:
+        if len(current_session_items) >= 2:
             sessions.append({
                 'session_id': f'session_{session_counter}',
                 'user_id': user_id,

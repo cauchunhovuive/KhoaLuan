@@ -37,7 +37,6 @@ const CategoriesManagePage = React.lazy(() => import('./pages/admin/CategoriesMa
 const OrdersManagePage = React.lazy(() => import('./pages/admin/OrdersManagePage'));
 const UsersManagePage = React.lazy(() => import('./pages/admin/UsersManagePage'));
 const ClustersPage = React.lazy(() => import('./pages/admin/ClustersPage'));
-const RecommendationsPage = React.lazy(() => import('./pages/admin/RecommendationsPage'));
 const SettingsPage = React.lazy(() => import('./pages/admin/SettingsPage'));
 const PartnersManagePage = React.lazy(() => import('./pages/admin/PartnersManagePage'));
 const CouponsPage = React.lazy(() => import('./pages/admin/CouponsPage'));
@@ -46,9 +45,7 @@ const FlashSaleManagementPage = React.lazy(() => import('./pages/admin/FlashSale
 const RefundManagementPage = React.lazy(() => import('./pages/admin/RefundManagementPage'));
 const ViolationManagementPage = React.lazy(() => import('./pages/admin/ViolationManagementPage'));
 const AuditLogPage = React.lazy(() => import('./pages/admin/AuditLogPage'));
-const ABTestingPage = React.lazy(() => import('./pages/admin/ABTestingPage'));
 const MLTestPage = React.lazy(() => import('./pages/admin/MLTestPage'));
-const SessionPaperDemoPage = React.lazy(() => import('./pages/admin/SessionPaperDemoPage'));
 
 // Lazy-loaded partner pages
 const PartnerDashboardPage = React.lazy(() => import('./pages/partner/PartnerDashboardPage'));
@@ -173,10 +170,7 @@ function App() {
         <Route path="violations" element={<Suspense fallback={<RouteFallback />}><ViolationManagementPage /></Suspense>} />
         <Route path="audit" element={<Suspense fallback={<RouteFallback />}><AuditLogPage /></Suspense>} />
         <Route path="clusters" element={<Suspense fallback={<RouteFallback />}><ClustersPage /></Suspense>} />
-        <Route path="recommendations" element={<Suspense fallback={<RouteFallback />}><RecommendationsPage /></Suspense>} />
-        <Route path="abtest" element={<Suspense fallback={<RouteFallback />}><ABTestingPage /></Suspense>} />
         <Route path="ml-test" element={<Suspense fallback={<RouteFallback />}><MLTestPage /></Suspense>} />
-        <Route path="paper-demo" element={<Suspense fallback={<RouteFallback />}><SessionPaperDemoPage /></Suspense>} />
         <Route path="settings" element={<Suspense fallback={<RouteFallback />}><SettingsPage /></Suspense>} />
       </Route>
     </Routes>

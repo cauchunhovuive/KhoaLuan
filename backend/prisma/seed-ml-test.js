@@ -22,17 +22,20 @@ async function main() {
   // ================================================================
   // 1. PRODUCT VIEWS — Cho Session-based Recommendations
   // ================================================================
-  // Xoá views cũ để seed lại với dữ liệu lớn hơn
+  // TÔN TRỌNG dữ liệu thật: chỉ seed views khi DB đang TRỐNG.
+  // View logs là dữ liệu train của HSP/RIC (bài báo session) — xoá mỗi lần
+  // restart làm mất lịch sử xem thật của khách và model học sai.
+  // Muốn seed lại có chủ đích: node prisma/seed-ml-views.js 300
   const existingViews = await prisma.productView.count();
   if (existingViews > 0) {
-    console.log(`  🗑️ Xoá ${existingViews} views cũ để tạo lại...`);
-    await prisma.productView.deleteMany();
+    console.log(`  ℹ Đã có ${existingViews} product views — bỏ qua seed views (giữ dữ liệu thật).`);
+    console.log('  Muốn seed lại dữ liệu views mẫu: node prisma/seed-ml-views.js');
+  } else {
+    await seedProductViews();
   }
 
-  console.log('\n📊 Tạo 200+ product views với co-occurrence pattern rõ ràng...');
-
   // Helper: tìm sản phẩm theo từ khóa trong tên (nhiều hơn 1 sản phẩm/từ khóa)
-  const findProducts = (keywords, maxItems = 12) => {
+  function findProducts(keywords, maxItems = 12) {
     const matched = [];
     const usedIds = new Set();
     for (const k of keywords) {
@@ -48,7 +51,10 @@ async function main() {
       if (matched.length >= maxItems) break;
     }
     return matched;
-  };
+  }
+
+  async function seedProductViews() {
+  console.log('\n📊 Tạo 200+ product views với co-occurrence pattern rõ ràng...');
 
   // Tạo 30+ sessions, mỗi session 5-12 products từ cùng category family
   // Một số products xuất hiện ở nhiều session để tạo co-occurrence đa dạng
@@ -136,9 +142,10 @@ async function main() {
     }
   }
   console.log(`  ✅ Tạo ${viewCount} product views (${sessions.length} sessions)`);
+  }
 
   // ================================================================
-  // 2. ĐƠN HÀNG BỔ SUNG — Cho Collaborative Filtering
+  // 2. ĐƠN HÀNG BỔ SUNG — Cho phân cluster & session recommendations
   // ================================================================
   const existingExtraOrders = await prisma.order.count();
   // Chỉ tạo nếu cần thêm (mục tiêu ~30-50 đơn hàng tổng cộng)

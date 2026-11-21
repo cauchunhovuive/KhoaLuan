@@ -123,7 +123,7 @@ def parse_md(path):
                 # Sơ đồ kiến trúc tổng thể (tự nhận diện ASCII) -> vẽ bằng shape
                 cur["blocks"].append(("diagram", "architecture"))
             elif "ML SERVICE (FastAPI" in joined and "RAG" in joined:
-                # Sơ đồ 7 nhóm ML service -> vẽ bằng shape
+                # Sơ đồ 3 nhóm ML service -> vẽ bằng shape
                 cur["blocks"].append(("diagram", "mlservice"))
             else:
                 cur["blocks"].append(("code", code))
@@ -535,7 +535,7 @@ def render_diagram_architecture(slide, x, y, w):
 
 
 def render_diagram_mlservice(slide, x, y, w):
-    """Sơ đồ 7 nhóm mô hình ML Service (thay ASCII)."""
+    """Sơ đồ 3 nhóm mô hình ML Service (thay ASCII)."""
     cont_h = 5.2
     cont = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(x), Inches(y),
                                   Inches(w), Inches(cont_h))
@@ -554,16 +554,8 @@ def render_diagram_mlservice(slide, x, y, w):
     groups = [
         ("1. Session-based", ("Co-occurrence", "Sequence Pred",
                                "HSP · RIC / RIC-CiL"), PRIMARY),
-        ("2. Collaborative", ("Item-Item · User-User", "ALS Matrix · Hybrid",
-                               ""), RGBColor(0x7C, 0x3A, 0xED)),
-        ("3. Graph-based", ("Graph CF (nhẹ)", "LightGCN-CF",
-                             "(PyTorch, BPR)"), EMERALD),
-        ("4. Clustering", ("RFM + K-Means", "4 cụm khách hàng", ""),
+        ("2. Clustering", ("RFM + K-Means", "4 cụm khách hàng", ""),
          RGBColor(0xD9, 0x77, 0x06)),
-        ("5. A/B Testing", ("Log → Compare", "→ Report", ""),
-         RGBColor(0xDB, 0x27, 0x77)),
-        ("6. Evaluation", ("Precision · Recall", "NDCG · Coverage", ""),
-         RGBColor(0x0D, 0x94, 0x88)),
     ]
     gy = y + 0.52
     gh = 1.42
@@ -575,7 +567,7 @@ def render_diagram_mlservice(slide, x, y, w):
     ry = gy + 2 * (gh + 0.22) + 0.1
     rh = cont_h - (ry - y) - 0.15
     _add_box(slide, x + 0.2, ry, w - 0.4, rh,
-             "7. RAG Chatbot — ChromaDB + sentence-transformers + Ollama llama3.2:3b / Groq",
+             "3. RAG Chatbot — ChromaDB + sentence-transformers + Ollama llama3.2:3b / Groq",
              ("Knowledge Base: sản phẩm · danh mục · chính sách · FAQ · hướng dẫn",
               "3 cấp fallback: Groq → Ollama local → keyword matching"),
              fill=DARK, title_size=12, sub_size=9.5)

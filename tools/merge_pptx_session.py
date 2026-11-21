@@ -112,7 +112,7 @@ def add_divider_slide(prs):
     p3 = tb3.text_frame.paragraphs[0]
     p3.alignment = PP_ALIGN.CENTER
     run = p3.add_run()
-    run.text = "Cài đặt: backend/ml/session · Demo live: python -m session.demo_paper"
+    run.text = "Cài đặt: backend/ml/session · Gợi ý live: trang chi tiết sản phẩm"
     run.font.size = Pt(12)
     run.font.color.rgb = LIGHT_BLUE
 
