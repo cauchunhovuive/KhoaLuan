@@ -70,8 +70,7 @@ const getSessionRecommendations = asyncHandler(async (req, res) => {
       products: products.map(p => ({ id: p.id, name: p.name })),
       top_n: topN,
       strategy,
-      // UI thật: không gợi ý lại các sản phẩm khách đã xem trong phiên
-      // (benchmark offline để false — đo MRR/Recall đúng protocol bài báo)
+      // Không gợi ý lại các sản phẩm khách đã xem trong phiên
       exclude_session_items: !!excludeSessionItems,
       ...(alpha != null ? { alpha } : {}),
     });
@@ -171,61 +170,6 @@ const trainSessionModel = asyncHandler(async (req, res) => {
 // ============================================================
 // ML Service Health & Info
 // ============================================================
-
-// @desc    Check ML service health
-// @route   GET /api/ml/paper/data?dataset=yoochoose
-const getPaperData = asyncHandler(async (req, res) => {
-  const ds = req.query?.dataset ? `?dataset=${encodeURIComponent(req.query.dataset)}` : '';
-  const result = await mlService.callML(`/session/paper-data${ds}`);
-  res.json(result);
-});
-
-// @desc    Chạy benchmark HSP & RIC trên dataset bài báo (yoochoose | diginetica)
-// @route   POST /api/ml/paper/benchmark
-const runPaperBenchmark = asyncHandler(async (req, res) => {
-  const { maxTest = 500, dataset = 'yoochoose' } = req.body;
-  const result = await mlService.callML('/session/benchmark', 'POST', { max_test: maxTest, dataset });
-  res.json(result);
-});
-
-// @desc    Gợi ý bằng model train sẵn trên dataset bài báo (yoochoose | diginetica)
-// @route   POST /api/ml/paper/recommend
-const paperRecommend = asyncHandler(async (req, res) => {
-  const { sessionItems, topN = 10, strategy = 'hybrid', alpha = null, dataset = 'yoochoose' } = req.body;
-
-  if (!sessionItems || !sessionItems.length) {
-    return res.status(400).json({ success: false, message: 'Thiếu sessionItems' });
-  }
-
-  const result = await mlService.callML('/session/paper-recommend', 'POST', {
-    session_items: sessionItems,
-    top_n: topN,
-    strategy,
-    dataset,
-    ...(alpha != null ? { alpha } : {}),
-  });
-  res.json(result);
-});
-
-// @desc    Reset model + cache benchmark (1 dataset hoặc tất cả — lần sau train lại từ đầu)
-// @route   POST /api/ml/paper/reset
-const resetPaperBenchmark = asyncHandler(async (req, res) => {
-  const { dataset = 'all' } = req.body || {};
-  const result = await mlService.callML(`/session/benchmark/reset?dataset=${encodeURIComponent(dataset)}`, 'POST');
-  res.json(result);
-});
-
-// @desc    Model bài báo đã học được gì — P0/P1/P2 + γ với phân số đếm thô (demo bài báo)
-// @route   POST /api/ml/paper/insights
-const paperInsights = asyncHandler(async (req, res) => {
-  const { sessionItems = [], topK = 4, dataset = 'yoochoose' } = req.body || {};
-  const result = await mlService.callML('/session/paper-insights', 'POST', {
-    session_items: sessionItems,
-    top_k: topK,
-    dataset,
-  });
-  res.json(result);
-});
 
 // @desc    Check ML service health
 // @route   GET /api/ml/health

@@ -1,6 +1,9 @@
-# 🛒 KhoaLuan — Hệ thống Thương mại Điện tử 3 Nhánh + AI
+# 🛒 KhoaLuan — Hệ thống Thương mại Điện tử 3 Nhánh + ML Gợi ý
 
-**Đề tài:** Hệ thống thương mại điện tử với 3 nhánh người dùng (Admin, Đối tác kinh doanh, Khách hàng) kết hợp **AI Recommendation Engine** (Session-based, Customer Clustering).
+**Đề tài:** Hệ thống thương mại điện tử với 3 nhánh người dùng (Admin, Đối tác kinh doanh, Khách hàng) kết hợp **ML Recommendation Engine** gồm 2 mô hình:
+
+- **Phân cụm khách hàng** — RFM + K-Means
+- **Gợi ý theo phiên (Session-based)** — Co-occurrence + Sequence Prediction + HSP/RIC
 
 ---
 
@@ -10,10 +13,11 @@
 - [🏗️ Kiến trúc tổng quan](#️-kiến-trúc-tổng-quan)
 - [🚀 Hướng dẫn chạy](#-hướng-dẫn-chạy)
 - [👥 3 Nhánh người dùng](#-3-nhánh-người-dùng)
-- [🧪 AI/ML Engine](#-aiml-engine)
+- [🧪 ML Engine](#-ml-engine)
 - [🧰 Công nghệ sử dụng](#-công-nghệ-sử-dụng)
 - [📁 Cấu trúc thư mục](#-cấu-trúc-thư-mục)
 - [🔌 API Endpoints](#-api-endpoints)
+- [💨 Hiệu suất & Tối ưu](#-hiệu-suất--tối-ưu)
 - [🗄️ Database Schema](#️-database-schema)
 - [🎨 Thiết kế giao diện](#-thiết-kế-giao-diện)
 - [✨ Tính năng nổi bật](#-tính-năng-nổi-bật)
@@ -77,24 +81,20 @@
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                     Frontend Web (React + Vite + Tailwind)               │
-│                  http://localhost:3000                                    │
-│                   + Mobile App (React Native + Expo)                      │
+│                     Frontend Web (React + Vite + Tailwind)             │
+│                  http://localhost:3000                                 │
+│                   + Mobile App (React Native + Expo)                   │
 ├────────────────────────────────────────────────────────────────────────┤
-│              Backend API (Node.js + Express + Prisma ORM)                 │
-│                  http://localhost:5000                                    │
-├────────────────────┬────────────────────────────────────────────────────┤
-│   ML Service       │    Database & Cache                                  │
-│   (Python/FastAPI) │    PostgreSQL 15 + Redis 7                           │
-│   http://localhost:8000 │         + ChromaDB (vectors)                     │
-├────────────────────┴────────────────────────────────────────────────────┤
-│   Ollama Local (LLM)                                                     │
-│   http://localhost:11434                                                  │
-│   Model: llama3.2:3b — Knowledge Base: ChromaDB + sentence-transformers   │
-└────────────────────────────────────────────────────────────────────────┘
+│              Backend API (Node.js + Express + Prisma ORM)              │
+│                  http://localhost:5000                                 │
+├────────────────────┬───────────────────────────────────────────────────┤
+│   ML Service       │    Database & Cache                               │
+│   (Python/FastAPI) │    PostgreSQL 15 + Redis 7                        │
+│   http://localhost:8000                                               │
+└────────────────────┴───────────────────────────────────────────────────┘
 ```
 
-Hệ thống gồm **5 Docker services**: `postgres`, `redis`, `backend`, `ml-service`, `frontend` + **Ollama** (chạy native)
+Hệ thống gồm **5 Docker services**: `postgres`, `redis`, `backend`, `ml-service`, `frontend`.
 
 ### Dữ liệu mẫu (seed)
 
@@ -173,8 +173,16 @@ TOKEN=$(curl -s -X POST http://localhost:5000/api/auth/login \
 # ML Health
 curl -H "Authorization: Bearer $TOKEN" http://localhost:5000/api/ml/health
 
-# Chạy toàn bộ ML test
+# Chạy bộ test ML (health, info, train session, clustering, trending, recommend)
 docker exec khoaluan-backend sh -c "node prisma/test-ml-all.js"
+```
+
+### Chạy ML Service riêng (không dùng Docker)
+
+```bash
+cd backend/ml
+pip install -r requirements.txt
+uvicorn clustering.api:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ---
@@ -199,7 +207,7 @@ Admin có toàn quyền quản lý hệ thống qua dashboard. **Admin không qu
 | 👥 **Quản lý người dùng** | Xem, sửa, phân quyền người dùng (10/trang) |
 | 🤝 **Quản lý đối tác** | Phê duyệt / từ chối đối tác mới đăng ký |
 | 🎯 **Phân cụm khách hàng** | Tạo nhóm, chạy phân cụm K-Means/RFM qua ML Service |
-| 🧪 **Kiểm tra ML** | Tự động chạy 6 ML endpoints (gồm HSP/RIC), báo cáo kết quả |
+| 🧪 **Kiểm tra ML** | Chạy tự động các bước: health, train session, clustering, trending, recommend |
 | 🏆 **Mã giảm giá** | CRUD mã giảm giá, theo dõi lượt sử dụng (10/trang) |
 | 🖼️ **Banner** | Quản lý banner trang chủ (vị trí, link, màu nền) |
 | ⚡ **Flash Sale** | Tạo sự kiện flash sale, thêm/xóa sản phẩm |
@@ -245,7 +253,6 @@ Partner có không gian riêng với các tính năng — **tự xử lý đơn 
 | ⭐ **Đánh giá sản phẩm** | Đánh giá và xem phản hồi từ người bán |
 | 📍 **Địa chỉ giao hàng** | Quản lý nhiều địa chỉ giao hàng |
 | 💬 **Chat với shop (Floating)** | Widget chat nổi — trò chuyện trực tiếp với shop mọi lúc |
-| 🤖 **Trợ lý AI (RAG + Ollama)** | Widget chat AI nổi — hỏi đáp sản phẩm, chính sách, vận chuyển dựa trên knowledge base thật (ChromaDB + Ollama local) |
 | 💰 **Yêu cầu hoàn tiền** | Gửi yêu cầu hoàn tiền cho đơn đã giao |
 | 🚨 **Báo cáo vi phạm** | Báo cáo shop/sản phẩm vi phạm |
 | 🚚 **Xác nhận đã nhận hàng** | Xác nhận đã nhận được hàng |
@@ -254,29 +261,27 @@ Partner có không gian riêng với các tính năng — **tự xử lý đơn 
 
 ---
 
-## 🧪 AI/ML Engine
+## 🧪 ML Engine
 
-### Kiến trúc
-
-ML Service chạy riêng biệt với backend (Python + FastAPI), cung cấp 4 nhóm model:
+ML Service chạy riêng biệt với backend (Python + FastAPI) và chỉ gồm **2 mô hình**: phân cụm khách hàng (K-Means) và gợi ý theo phiên (Session-based).
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Backend (Node.js)                              │
+│                    Backend (Node.js)                             │
 │  mlService.js → callML() → proxy request → fetch(60s timeout)    │
 ├─────────────────────────────────────────────────────────────────┤
-│                    ML Service (Python FastAPI)                    │
-│  ┌───────────────────────────┐  ┌───────────────────────────┐     │
-│  │      Session-based        │  │        Clustering         │     │
-│  │  Co-occurrence            │  │        RFM                │     │
-│  │  Sequence Pred            │  │    + K-Means              │     │
-│  │  HSP · RIC                │  │                           │     │
-│  │  281 views                │  │      4 clusters           │     │
-│  └───────────────────────────┘  └───────────────────────────┘     │
+│                    ML Service (Python FastAPI)                   │
+│  ┌───────────────────────────┐  ┌───────────────────────────┐    │
+│  │      Session-based        │  │        Clustering         │    │
+│  │  Co-occurrence            │  │          RFM              │    │
+│  │  Sequence Prediction      │  │       + K-Means           │    │
+│  │  HSP · RIC                │  │                           │    │
+│  │  (từ 281 product views)   │  │      4 clusters           │    │
+│  └───────────────────────────┘  └───────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### ML Endpoints
+### ML Endpoints (FastAPI)
 
 | Endpoint | Mô tả | Auth | Thời gian |
 |----------|-------|:----:|:---------:|
@@ -284,72 +289,38 @@ ML Service chạy riêng biệt với backend (Python + FastAPI), cung cấp 4 n
 | `GET /health` | Health check chi tiết | Public | ~2ms |
 | `GET /info` | Thông tin service & models | Public | ~2ms |
 | `POST /cluster/run` | Chạy phân cụm K-Means + RFM | ADMIN | ~200ms |
+| `POST /cluster/recommend` | Gợi ý sản phẩm theo cụm | — | ~50ms |
+| `GET /cluster/profiles` | Xem profile các cụm đã train | — | ~2ms |
+| `GET /cluster/stats` | Thống kê phân bố cụm | — | ~2ms |
 | `POST /session/train` | Huấn luyện Session-based model | ADMIN | ~20ms |
-| `POST /session/recommend` | Gợi ý theo phiên (co-occurrence + sequence) | Public | ~80ms |
+| `POST /session/recommend` | Gợi ý theo phiên (auto-train) | Public | ~80ms |
 
 ### Thuật toán
 
 | Model | Kỹ thuật |
 |-------|----------|
-| **Session-based** | Co-occurrence Matrix + Sequence Prediction (Markov chain) + HSP/RIC |
-| **Clustering** | RFM Analysis (Recency, Frequency, Monetary) + K-Means |
+| **Clustering** | RFM Analysis (Recency, Frequency, Monetary) + K-Means (silhouette score để chọn số cụm) |
+| **Session-based** | Co-occurrence Matrix, Sequence Prediction (Markov chain), HSP, RIC (forgetting factor α), RIC-CIL, Popularity fallback |
 
-### Kết quả test gần nhất
+### Chiến lược gợi ý theo phiên
 
-```
-═══════════════════════════════════════════════════════
-📊 KẾT QUẢ TEST ML — 6/6 passed (100%) 🎉
-═══════════════════════════════════════════════════════
-  ✅ ML Health                        (2ms)
-  ✅ ML Engine Info                   (2ms)
-  ✅ Train Session (282 views)        (22ms)
-  ✅ Run Clustering (4 clusters, 15 users) (203ms)
-  ✅ Trending Products (4 sản phẩm)   (2ms)
-  ✅ Session Recommend (5 gợi ý)      (83ms)
-═══════════════════════════════════════════════════════
-  ✅ Passed: 6/6 (100%)
-═══════════════════════════════════════════════════════
-```
+Trường `strategy` trong `POST /session/recommend`:
 
-### Metrics đánh giá
+| Strategy | Mô tả |
+|----------|-------|
+| `hybrid` *(mặc định)* | Kết hợp co-occurrence + sequence |
+| `cooccurrence` | Chỉ dựa trên ma trận đồng xuất hiện trong phiên |
+| `sequence` | Dựa trên dự đoán chuỗi hành vi (Markov) |
+| `hsp` | Hybrid Session Pattern |
+| `ric` | Item-based RIC với forgetting factor `alpha` (0.1–0.9, mặc định 0.3) |
+| `ric_cil` | RIC + thông tin phiên hiện tại |
+| `popularity` | Fallback theo độ phổ biến |
 
-| Metric | Giá trị |
-|--------|:-------:|
-| Precision | 0.014 |
-| Recall | 0.036 |
-| F1 Score | 0.020 |
-| Hit Rate | 0.143 |
-| MAP Score | 0.007 |
-| NDCG Score | 0.022 |
-| Coverage | 0.465 |
-| Popularity Bias | 0.157 |
+Tham số tuỳ chọn khác: `top_n`, `exclude_session_items` (không gợi ý lại sản phẩm khách đang xem trong phiên).
 
-### Benchmark HSP & RIC trên Yoochoose (bài báo Session-based)
+### Cơ chế auto-train
 
-Dataset **Yoochoose** (RecSys Challenge 2015 — 375,043 phiên mua sắm thật, 16,245 sản phẩm) đã được track trong repo tại `backend/ml/datasets/yoochoose/` — chạy lại benchmark trực tiếp mà không cần tải dữ liệu:
-
-```bash
-cd backend/ml
-
-# Demo nhanh (~1 phút): train 375k phiên + đánh giá 500 phiên test đầu
-python -m session.benchmark_hsp_ric --dataset yoochoose --max_test 500
-
-# Đánh giá đầy đủ như bài báo Delianidi et al. 2023 (MRR@K, Recall@K với K=10,20,30)
-# (cuối màn chạy tự tune forgetting factor α của RIC từ 0.1 → 0.9)
-python -m session.benchmark_hsp_ric --dataset yoochoose --max_test 5000
-```
-
-Kết quả chuẩn đã ghi nhận (5000 phiên test, `benchmark_yoochoose_results.txt`):
-
-| Method | MRR@10 | Rec@10 | Rec@20 |
-|--------|:------:|:------:|:------:|
-| cooccurrence | 0.1595 | 0.3224 | 0.4018 |
-| sequence | 0.1855 | 0.3742 | 0.4562 |
-| hsp | 0.1227 | 0.2670 | 0.3426 |
-| **ric** | **0.1902** | **0.3746** | **0.4490** |
-| ric_cil | 0.1902 | 0.3746 | 0.4490 |
-
-> Thời gian train ~11s trên CPU thường, không cần GPU. Dataset Diginetica (42MB) không track trong repo — tải tại [RecoHut-Datasets/diginetica](https://github.com/RecoHut-Datasets/diginetica) nếu cần chạy thêm.
+UI gọi `/session/recommend` liên tục; backend ML tự kiểm tra dữ liệu mới và chỉ fit lại model khi cần (throttle tối đa 5 phút/lần). Admin có thể bấm **Huấn luyện Session** để force train lại ngay từ `POST /session/train` (hoặc `POST /api/ml/session/train` qua Node).
 
 ---
 
@@ -358,11 +329,10 @@ Kết quả chuẩn đã ghi nhận (5000 phiên test, `benchmark_yoochoose_resu
 | Layer | Công nghệ |
 |-------|-----------|
 | **Frontend Web** | React 18 + Vite + Redux Toolkit + Tailwind CSS + React Router + Recharts + Chart.js + react-hot-toast + react-icons + Fontsource Geist |
-| **Frontend Components** | LazyImage (IntersectionObserver + blur-up), ChatFloating (Shop + RAG AI tabs), CouponsPage (voucher + save), code splitting (React.lazy), chunk optimization (Vite manualChunks) |
+| **Frontend Components** | LazyImage (IntersectionObserver + blur-up), ChatFloating (chat với shop), CouponsPage (voucher + save), code splitting (React.lazy), chunk optimization (Vite manualChunks) |
 | **Mobile App** | React Native + Expo + React Navigation + Redux Toolkit + Axios |
 | **Backend API** | Node.js + Express.js + Prisma ORM + JWT + bcryptjs + ioredis + Winston + Morgan + Helmet + express-rate-limit + Joi |
-| **ML Service** | Python + FastAPI + scikit-learn (K-Means, RFM) + NumPy + SciPy + ChromaDB + sentence-transformers |
-| **AI Chat** | RAG (Retrieval-Augmented Generation) + Ollama local (llama3.2:3b) + ChromaDB vector store |
+| **ML Service** | Python + FastAPI + scikit-learn (K-Means, RFM, StandardScaler) + NumPy + Pandas + Uvicorn |
 | **Database** | PostgreSQL 15 (Alpine) |
 | **Cache** | Redis 7 (Alpine) với ioredis |
 | **Xác thực** | JWT (access token 15 phút + refresh token 30 ngày) + Google OAuth 2.0 (Passport.js) |
@@ -376,7 +346,7 @@ Kết quả chuẩn đã ghi nhận (5000 phiên test, `benchmark_yoochoose_resu
 ```
 KHOALUAN/
 ├── backend/                              # Backend API (Node.js + Express + Prisma)
-│   ├── Dockerfile                        # Docker image
+│   ├── Dockerfile
 │   ├── package.json
 │   ├── start.sh                          # Startup: push schema → seed ×4
 │   ├── src/
@@ -400,7 +370,7 @@ KHOALUAN/
 │   │   │   ├── flashSaleController.js    # Flash sale
 │   │   │   ├── refundController.js       # Hoàn tiền
 │   │   │   ├── violationController.js    # Vi phạm
-│   │   │   ├── chatController.js         # Chat
+│   │   │   ├── chatController.js         # Chat khách hàng ↔ shop
 │   │   │   ├── dashboardController.js    # Thống kê admin
 │   │   │   ├── clusterController.js      # Phân cụm khách hàng
 │   │   │   ├── recommendationController.js # Gợi ý (personalized, trending, similar)
@@ -428,23 +398,17 @@ KHOALUAN/
 │   │   ├── seed-full.js                  # Dữ liệu mở rộng (8 partners, 101 products)
 │   │   ├── seed-new-models.js            # Banners, flash sales, refunds, violations...
 │   │   ├── seed-ml-test.js               # 281 product views, orders cho ML
-│   │   └── test-ml-all.js                # Auto-test 10 ML endpoints
+│   │   └── test-ml-all.js                # Auto-test các endpoint ML
 │   └── ml/                               # ML Service (Python)
 │       ├── Dockerfile.ml
 │       ├── requirements.txt
-│       ├── rag/                              # 🆕 RAG Chat AI Module
-│       │   ├── __init__.py
-│       │   ├── knowledge_base.py             # ChromaDB vector store + sentence-transformers
-│       │   ├── rag_service.py                # RAG pipeline: search KB → Ollama generate
-│       │   ├── build_kb.py                   # Build KB from PostgreSQL
-│       │   └── data/                         # ChromaDB persistence directory
 │       ├── clustering/
-│       │   ├── api.py                    # FastAPI endpoints (tất cả ML routes + RAG endpoints)
-│       │   ├── clustering_service.py     # K-Means + RFM
+│       │   ├── api.py                    # FastAPI endpoints: clustering + session
+│       │   ├── clustering_service.py     # RFM + K-Means
 │       │   └── __init__.py
-│       ├── session/
-│       │   ├── session_recommender.py     # Co-occurrence + Sequence Prediction
-│       │   └── __init__.py
+│       └── session/
+│           ├── session_recommender.py     # Co-occurrence + Sequence + HSP/RIC
+│           └── __init__.py
 │
 ├── frontend/                             # Frontend Web (React + Vite + Tailwind)
 │   ├── Dockerfile
@@ -460,19 +424,21 @@ KHOALUAN/
 │       ├── store/
 │       │   ├── index.js                  # Redux store
 │       │   ├── authSlice.js              # JWT refresh
-│       │   ├── cartSlice.js              # Giỏ hàng│   │   ├── productSlice.js           # Sản phẩm
-│   │   ├── settingsSlice.js          # Cài đặt
+│       │   ├── cartSlice.js              # Giỏ hàng
+│       │   ├── productSlice.js           # Sản phẩm
+│       │   ├── settingsSlice.js          # Cài đặt
 │       │   ├── notificationSlice.js      # Thông báo (poll 30s)
 │       │   └── uiSlice.js                # UI state
 │       ├── services/
-│       │   └── api.js                    # Axios + JWT interceptor
+│       │   ├── api.js                    # Axios + JWT interceptor
+│       │   └── sessionRecommender.js     # Client gọi /ml/session/recommend
 │       ├── components/
 │       │   ├── Layout/ (Navbar, Footer, MainLayout, AdminLayout, PartnerLayout)
-│       │   └── common/ (ProductCard, LoadingSpinner, BannerSlider, Pagination)
+│       │   └── common/ (ProductCard, LoadingSpinner, BannerSlider, Pagination, ChatFloating, LazyImage)
 │       └── pages/
 │           ├── admin/ (15 trang: Dashboard, ML Test, Clusters...)
 │           ├── partner/ (7 trang: Dashboard, Products, Orders...)
-│           ├── auth/ (LoginPage, RegisterPage)
+│           ├── auth/ (LoginPage, RegisterPage, GoogleCallbackPage)
 │           └── ... (Home, Products, Cart, Checkout, Orders...)
 │
 ├── mobile/                               # Mobile App (React Native + Expo)
@@ -533,11 +499,11 @@ KHOALUAN/
 ### ML — Session-Based
 | Method | Endpoint | Mô tả | Auth |
 |--------|----------|-------|:----:|
-| POST | `/ml/session/recommend` | Gợi ý theo phiên (auto-train) | Public |
+| POST | `/ml/session/recommend` | Gợi ý theo phiên (auto-train; hỗ trợ `strategy`, `topN`) | Public |
 | POST | `/ml/session/train` | Huấn luyện Session model | ADMIN |
 | GET | `/ml/health` | ML Service health | Public |
 
-### Clusters
+### ML — Clustering (gọi qua Node → Python)
 | Method | Endpoint | Mô tả | Auth |
 |--------|----------|-------|:----:|
 | GET | `/clusters` | Danh sách nhóm (kèm rules) | ADMIN |
@@ -664,7 +630,7 @@ Recommendation → User?, Cluster?, Product (score, reason)
 - **Phân trang:** 10 items/trang trên tất cả danh sách
 - **Custom Tailwind theme:** primary 50-900, surface, ink, premium shadows
 
-### Giao diện AI (Vietsub toàn bộ)
+### Giao diện ML (Vietsub toàn bộ)
 
 | Trang admin | Ngôn ngữ |
 |-------------|:--------:|
@@ -681,80 +647,35 @@ Recommendation → User?, Cluster?, Product (score, reason)
 4. **Google OAuth Login** — Đăng nhập bằng Google, tự động tạo user nếu chưa tồn tại
 5. **Inline Email Registration** — Nhập email → check tồn tại → đăng nhập hoặc hiện form đăng ký ngay trên trang login
 6. **JWT 15 phút** — Access token hết hạn sau 15 phút, tự động refresh, bảo mật cao hơn
-7. **Session-based Recommendation** — Co-occurrence + Sequence Prediction (281 views)
-8. **Auto-Train ML** — Tự động train session model trước khi recommend
-9. **ML Test Suite** — Tự động kiểm tra 6 ML endpoints, báo cáo chi tiết
-10. **Phân cụm khách hàng** — K-Means + RFM qua ML Service riêng
-13. **Gợi ý cá nhân hóa** — Dựa trên nhóm khách hàng + lịch sử mua hàng
-14. **Flash Sale** — Sự kiện giảm giá có thời gian, quản lý số lượng
-15. **Mã giảm giá** — 22 mã PERCENTAGE/FIXED, có hạn, theo người dùng
-16. **Chat** — Giữa khách hàng và shop (poll-based)
-17. **Follow shop** — Theo dõi cửa hàng yêu thích
-18. **Hoàn tiền & Vi phạm** — Quy trình xử lý khiếu nại
-19. **Audit Log** — Ghi lại mọi hành động quan trọng
-20. **Thông báo realtime** — Poll 30s cho admin
-21. **Redis Caching** — Cache sản phẩm, gợi ý, trending
-22. **Rate Limiting** — Giới hạn request
-23. **Mobile App** — React Native + Expo (iOS/Android)
-24. **Premium UI toàn diện** — Geist font, glass effects (glass-island), double-bezel cards, skeleton shimmer, stagger animations, custom cubic-bezier transitions
-25. **Phân trang đồng bộ** — 10 items/trang
-26. **Floating Chat Widget** — 2 tab (Shop + AI), glass-morphism panel, luôn sẵn sàng trên mọi trang
-27. **Trợ lý AI (RAG + Ollama)** — RAG pipeline với ChromaDB vector store + Ollama local (llama3.2). Hỏi đáp thông minh về sản phẩm, chính sách, FAQ dựa trên knowledge base thật. Fallback keyword-matching khi Ollama không khả dụng.
-28. **Lazy Image Loading** — IntersectionObserver + blur-up transition, skeleton placeholder
-29. **Code Splitting** — React.lazy() cho 25+ admin/partner routes, Suspense fallback
-30. **Chunk Optimization** — Tách recharts/react-icons thành chunk riêng, tăng cache hit
-31. **Vietsub toàn bộ Admin AI** — ML, Clusters tiếng Việt
-32. **Kho voucher cho user** — Trang /coupons với tab Tất cả/Đã lưu, lọc theo loại, copy mã, đếm ngược hết hạn, skeleton loading
-33. **Avatar upload** — Chọn ảnh → FileReader base64 → dispatch updateProfile, validate file type & size, spinner loading
-34. **Order stats realtime** — Tổng đơn, hoàn thành, đã huỷ từ API, dùng pagination.total chính xác
-35. **HomePage filter pills** — Mùa hè, Mới nhất, Bán chạy, Đánh giá cao, AI Đề xuất — kết nối API sorting thật
-36. **PartnerLayout frame** — max-w-7xl container giới hạn hiển thị trên màn hình rộng
-37. **Loading skeleton cho CouponsPage** — FullPageSkeleton với hero + tabs + filters + card shimmer
+7. **Session-based Recommendation** — Co-occurrence + Sequence Prediction + HSP/RIC trên 281 product views
+8. **Auto-Train ML** — Tự động train session model trước khi recommend (throttle 5 phút)
+9. **ML Test Suite** — Tự động kiểm tra các bước ML, báo cáo chi tiết từng bước
+10. **Phân cụm khách hàng** — K-Means + RFM qua ML Service riêng, chọn số cụm bằng silhouette score
+11. **Gợi ý cá nhân hóa** — Dựa trên nhóm khách hàng + lịch sử mua hàng
+12. **Flash Sale** — Sự kiện giảm giá có thời gian, quản lý số lượng
+13. **Mã giảm giá** — 22 mã PERCENTAGE/FIXED, có hạn, theo người dùng
+14. **Chat** — Giữa khách hàng và shop (poll-based, widget nổi)
+15. **Follow shop** — Theo dõi cửa hàng yêu thích
+16. **Hoàn tiền & Vi phạm** — Quy trình xử lý khiếu nại
+17. **Audit Log** — Ghi lại mọi hành động quan trọng
+18. **Thông báo realtime** — Poll 30s cho admin
+19. **Redis Caching** — Cache sản phẩm, gợi ý, trending
+20. **Rate Limiting** — Giới hạn request
+21. **Mobile App** — React Native + Expo (iOS/Android)
+22. **Premium UI toàn diện** — Geist font, glass effects (glass-island), double-bezel cards, skeleton shimmer, stagger animations, custom cubic-bezier transitions
+23. **Phân trang đồng bộ** — 10 items/trang
+24. **Floating Chat Widget** — Glass-morphism panel, luôn sẵn sàng trên mọi trang
+25. **Lazy Image Loading** — IntersectionObserver + blur-up transition, skeleton placeholder
+26. **Code Splitting** — React.lazy() cho 25+ admin/partner routes, Suspense fallback
+27. **Chunk Optimization** — Tách recharts/react-icons thành chunk riêng, tăng cache hit
+28. **Vietsub toàn bộ Admin ML** — ML Test, Clusters tiếng Việt
+29. **Kho voucher cho user** — Trang /coupons với tab Tất cả/Đã lưu, lọc theo loại, copy mã, đếm ngược hết hạn, skeleton loading
+30. **Avatar upload** — Chọn ảnh → FileReader base64 → dispatch updateProfile, validate file type & size, spinner loading
+31. **Order stats realtime** — Tổng đơn, hoàn thành, đã huỷ từ API, dùng pagination.total chính xác
+32. **HomePage filter pills** — Mùa hè, Mới nhất, Bán chạy, Đánh giá cao, AI Đề xuất — kết nối API sorting thật
+33. **PartnerLayout frame** — max-w-7xl container giới hạn hiển thị trên màn hình rộng
+34. **Loading skeleton cho CouponsPage** — FullPageSkeleton với hero + tabs + filters + card shimmer
 
 ---
 
-## 🤖 RAG Chat AI (Ollama + ChromaDB)
-
-### Kiến trúc
-
-```
-User → ChatFloating.jsx
-  → POST /api/chat/ai (Node.js proxy)
-    → POST /rag/ask (Python ML Service, port 8000)
-      → Knowledge Base (ChromaDB vector store)
-      → Ollama local (llama3.2, port 11434)
-      ← Response (có fallback keyword-matching)
-```
-
-### Knowledge Base
-
-Được xây dựng từ:
-| Loại | Nguồn | Số lượng (dự kiến) |
-|------|-------|:------------------:|
-| 📦 Sản phẩm | PostgreSQL (Product table) | ~500 |
-| 📁 Danh mục | PostgreSQL (Category table) | ~10 |
-| 📜 Chính sách | Static (vận chuyển, đổi trả, bảo hành, thanh toán) | 4 |
-| ❓ FAQ | Static (theo dõi đơn, huỷ đơn, đăng ký, giảm giá, follow shop, tìm kiếm) | 6 |
-| 📖 Hướng dẫn | Static (quản lý tài khoản, đặt hàng, flash sale) | 3 |
-
-### Cài đặt
-
-```bash
-# 1. Cài Ollama (https://ollama.com)
-# 2. Pull model
-ollama pull llama3.2:3b
-
-# 3. Cài Python dependencies
-cd backend/ml
-pip install -r requirements.txt
-
-# 4. Build knowledge base từ database
-python -m rag.build_kb --force
-
-# 5. Chạy ML service
-uvicorn clustering.api:app --host 0.0.0.0 --port 8000 --reload
-```
-
-*Đồ án tốt nghiệp — Hệ thống thương mại điện tử 3 nhánh với AI Recommendation Engine*
-
-**Kết quả ML Test gần nhất:** ✅ 13/13 passed (100%) — Xem chi tiết tại http://localhost:3000/admin/ml-test
+*Đồ án tốt nghiệp — Hệ thống thương mại điện tử 3 nhánh với ML Recommendation Engine (K-Means + Session-based)*
